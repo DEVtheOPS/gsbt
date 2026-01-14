@@ -1,6 +1,6 @@
 # GSBT Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan in the current session with parallel subagents.
 
 **Goal:** Build a modular gameserver backup CLI tool in Go with FTP, SFTP, and Nitrado connectors.
 
