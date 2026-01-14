@@ -15,6 +15,7 @@ import (
 var (
 	backupServer     string
 	backupSequential bool
+	backupRich       bool
 )
 
 // allow tests to inject mocks
@@ -33,6 +34,7 @@ var backupCmd = &cobra.Command{
 func init() {
 	backupCmd.Flags().StringVar(&backupServer, "server", "", "backup specific server only")
 	backupCmd.Flags().BoolVar(&backupSequential, "sequential", false, "run backups sequentially")
+	backupCmd.Flags().BoolVar(&backupRich, "rich", false, "enable rich progress output")
 	rootCmd.AddCommand(backupCmd)
 }
 
@@ -95,6 +97,7 @@ func runBackup(ctx context.Context, cmd *cobra.Command) error {
 		mgr := backup.Manager{
 			BackupLocation: srv.GetBackupLocation(cfg.Defaults),
 			TempDir:        cfg.Defaults.TempDir,
+			Progress:       newProgressReporter(cmd),
 		}
 
 		start := time.Now()
