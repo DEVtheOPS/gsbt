@@ -3,8 +3,16 @@ package cli
 
 import (
 	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/digitalfiz/gsbt/internal/config"
+	"github.com/digitalfiz/gsbt/internal/connector"
 )
 
 // TestBackupCommandMetadata tests backup command structure
@@ -44,8 +52,8 @@ func TestBackupCommandFlags(t *testing.T) {
 	}
 }
 
-// TestBackupCommandStub tests backup command stub output
-func TestBackupCommandStub(t *testing.T) {
+// TestBackupCommandExec runs backup with a minimal config and mock connector
+func TestBackupCommandExec(t *testing.T) {
 	resetRootCmd()
 	resetFlags()
 	rootCmd.AddCommand(backupCmd)
@@ -53,7 +61,34 @@ func TestBackupCommandStub(t *testing.T) {
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"backup"})
+
+	// Temp config file with one FTP server
+	tmp := t.TempDir()
+	backups := filepath.Join(tmp, "backups")
+	cfgPath := filepath.Join(tmp, "config.yml")
+	cfg := fmt.Sprintf(`
+defaults:
+  backup_location: %s
+servers:
+  - name: test
+    connection:
+      type: ftp
+      host: example.com
+      username: user
+      password: pass
+      remote_path: /data
+`, backups)
+	if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origNewConnector := newConnector
+	newConnector = func(cfg connector.Config) (connector.Connector, error) {
+		return &mockSuccessConnector{}, nil
+	}
+	defer func() { newConnector = origNewConnector }()
+
+	rootCmd.SetArgs([]string{"backup", "--config", cfgPath})
 
 	err := rootCmd.Execute()
 	if err != nil {
@@ -61,11 +96,92 @@ func TestBackupCommandStub(t *testing.T) {
 	}
 
 	output := buf.String()
-	expected := "backup command - not yet implemented"
-	if !strings.Contains(output, expected) {
-		t.Errorf("backup output missing %q\nGot: %s", expected, output)
+	if !strings.Contains(output, "backup complete") {
+		t.Errorf("expected success message, got: %s", output)
 	}
 }
+
+// runBackup uses config discovery; provide a minimal mock by overriding newConnector.
+func TestRunBackup_ConfigError(t *testing.T) {
+	resetRootCmd()
+	resetFlags()
+	rootCmd.AddCommand(backupCmd)
+
+	// Force config discovery failure
+	rootCmd.SetArgs([]string{"backup", "--config", "/nonexistent"})
+
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing config, got nil")
+	}
+}
+
+func TestToConnectorConfigRequiresRemotePath(t *testing.T) {
+	server := config.Server{
+		Connection: config.Connection{
+			Type: "ftp",
+		},
+	}
+	defaults := config.Defaults{}
+
+	_, err := toConnectorConfig(server, defaults)
+	if err == nil {
+		t.Fatal("expected error for missing remote_path")
+	}
+}
+
+func TestRunBackupSuccess(t *testing.T) {
+	resetRootCmd()
+	resetFlags()
+	rootCmd.AddCommand(backupCmd)
+
+	// Prepare temp config file
+	cfgYAML := `
+defaults:
+  backup_location: %s
+servers:
+  - name: test
+    connection:
+      type: ftp
+      host: example.com
+      remote_path: /data
+`
+
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, "config.yml")
+	os.WriteFile(cfgPath, []byte(fmt.Sprintf(cfgYAML, filepath.Join(tmp, "backups"))), 0o644)
+
+	// Mock connector
+	origNewConnector := newConnector
+	newConnector = func(cfg connector.Config) (connector.Connector, error) {
+		return &mockSuccessConnector{}, nil
+	}
+	defer func() { newConnector = origNewConnector }()
+
+	rootCmd.SetArgs([]string{"backup", "--config", cfgPath})
+
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+}
+
+// mockSuccessConnector implements connector.Connector for CLI integration test
+type mockSuccessConnector struct{}
+
+func (m *mockSuccessConnector) Connect(ctx context.Context) error { return nil }
+func (m *mockSuccessConnector) List(ctx context.Context) ([]connector.FileInfo, error) {
+	return []connector.FileInfo{{Path: "file.txt"}}, nil
+}
+func (m *mockSuccessConnector) Download(ctx context.Context, remotePath string, w io.Writer) error {
+	_, _ = w.Write([]byte("data"))
+	return nil
+}
+func (m *mockSuccessConnector) Upload(ctx context.Context, r io.Reader, remotePath string) error {
+	return nil
+}
+func (m *mockSuccessConnector) Close() error { return nil }
+func (m *mockSuccessConnector) Name() string { return "mock" }
 
 // TestBackupCommandHelp tests backup command help
 func TestBackupCommandHelp(t *testing.T) {
