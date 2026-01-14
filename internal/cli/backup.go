@@ -101,7 +101,7 @@ func runBackup(ctx context.Context, cmd *cobra.Command) error {
 		}
 
 		start := time.Now()
-		archivePath, err := mgr.Backup(ctx, conn)
+		archivePath, stats, err := mgr.Backup(ctx, conn)
 		if err != nil {
 			failures++
 			fmt.Fprintf(cmd.ErrOrStderr(), "[%s] backup failed: %v\n", srv.Name, err)
@@ -110,7 +110,8 @@ func runBackup(ctx context.Context, cmd *cobra.Command) error {
 
 		successes++
 		if !IsQuiet() {
-			fmt.Fprintf(cmd.OutOrStdout(), "[%s] saved %s (%.1fs)\n", srv.Name, archivePath, time.Since(start).Seconds())
+			fmt.Fprintf(cmd.OutOrStdout(), "[%s] saved %s (%d files, %.1f MB, %.1fs)\n",
+				srv.Name, archivePath, stats.Files, float64(stats.Bytes)/1e6, time.Since(start).Seconds())
 		}
 	}
 
