@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/digitalfiz/gsbt/internal/connector"
 )
@@ -27,14 +28,24 @@ type Manager struct {
 	Progress       ProgressReporter
 }
 
+// Stats represents a summary of a backup run.
+type Stats struct {
+	Files    int
+	Bytes    int64
+	Duration time.Duration
+}
+
 // Backup pulls files via connector, archives them, and writes to backup location.
-func (m *Manager) Backup(ctx context.Context, conn connector.Connector) (string, error) {
+func (m *Manager) Backup(ctx context.Context, conn connector.Connector) (string, Stats, error) {
+	start := time.Now()
+	stats := Stats{}
+
 	if conn == nil {
-		return "", fmt.Errorf("connector is required")
+		return "", stats, fmt.Errorf("connector is required")
 	}
 
 	if m.BackupLocation == "" {
-		return "", fmt.Errorf("backup location is required")
+		return "", stats, fmt.Errorf("backup location is required")
 	}
 
 	tempDir := m.TempDir
@@ -43,23 +54,27 @@ func (m *Manager) Backup(ctx context.Context, conn connector.Connector) (string,
 	}
 
 	if err := os.MkdirAll(tempDir, 0o755); err != nil {
-		return "", fmt.Errorf("create temp dir: %w", err)
+		return "", stats, fmt.Errorf("create temp dir: %w", err)
 	}
 
 	if err := conn.Connect(ctx); err != nil {
-		return "", err
+		return "", stats, err
 	}
 	defer conn.Close()
 
 	// List files
 	files, err := conn.List(ctx)
 	if err != nil {
-		return "", fmt.Errorf("list: %w", err)
+		return "", stats, fmt.Errorf("list: %w", err)
 	}
 
 	var totalSize int64
 	for _, f := range files {
-		totalSize += f.Size
+		if !f.IsDir {
+			stats.Files++
+			stats.Bytes += f.Size
+			totalSize += f.Size
+		}
 	}
 	if m.Progress != nil {
 		m.Progress.Start(totalSize, len(files))
@@ -75,12 +90,12 @@ func (m *Manager) Backup(ctx context.Context, conn connector.Connector) (string,
 		}
 
 		if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
-			return "", fmt.Errorf("mkdir for %s: %w", file.Path, err)
+			return "", stats, fmt.Errorf("mkdir for %s: %w", file.Path, err)
 		}
 
 		f, err := os.Create(localPath)
 		if err != nil {
-			return "", fmt.Errorf("create %s: %w", file.Path, err)
+			return "", stats, fmt.Errorf("create %s: %w", file.Path, err)
 		}
 
 		if m.Progress != nil {
@@ -96,7 +111,7 @@ func (m *Manager) Backup(ctx context.Context, conn connector.Connector) (string,
 
 		if err := conn.Download(ctx, file.Path, pw); err != nil {
 			f.Close()
-			return "", fmt.Errorf("download %s: %w", file.Path, err)
+			return "", stats, fmt.Errorf("download %s: %w", file.Path, err)
 		}
 		f.Close()
 
@@ -108,15 +123,16 @@ func (m *Manager) Backup(ctx context.Context, conn connector.Connector) (string,
 	// Build archive path
 	archiveDir := m.BackupLocation
 	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
-		return "", fmt.Errorf("create backup dir: %w", err)
+		return "", stats, fmt.Errorf("create backup dir: %w", err)
 	}
 
 	archivePath := filepath.Join(archiveDir, TimestampedFilename())
 	if err := CreateArchive(tempDir, archivePath); err != nil {
-		return "", fmt.Errorf("create archive: %w", err)
+		return "", stats, fmt.Errorf("create archive: %w", err)
 	}
 
-	return archivePath, nil
+	stats.Duration = time.Since(start)
+	return archivePath, stats, nil
 }
 
 // progressWriter wraps an io.Writer to report incremental bytes written.

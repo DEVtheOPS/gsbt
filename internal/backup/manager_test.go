@@ -42,8 +42,8 @@ func (m *mockConnector) Close() error                                           
 func (m *mockConnector) Name() string                                                     { return "mock" }
 
 func TestManagerBackup(t *testing.T) {
-    ctx := context.Background()
-    tmp := t.TempDir()
+	ctx := context.Background()
+	tmp := t.TempDir()
 
 	mock := &mockConnector{
 		files: []connector.FileInfo{
@@ -56,8 +56,8 @@ func TestManagerBackup(t *testing.T) {
 		},
 	}
 
-    mgr := Manager{BackupLocation: tmp}
-	archivePath, err := mgr.Backup(ctx, mock)
+	mgr := Manager{BackupLocation: tmp}
+	archivePath, stats, err := mgr.Backup(ctx, mock)
 	if err != nil {
 		t.Fatalf("Backup error: %v", err)
 	}
@@ -69,5 +69,12 @@ func TestManagerBackup(t *testing.T) {
 	// Archive should live in backup location
 	if filepath.Dir(archivePath) != tmp {
 		t.Fatalf("archive dir = %s, want %s", filepath.Dir(archivePath), tmp)
+	}
+
+	if stats.Files != 2 {
+		t.Fatalf("stats files = %d, want 2", stats.Files)
+	}
+	if stats.Bytes != int64(len("hello")+len("world")) {
+		t.Fatalf("stats bytes = %d, want %d", stats.Bytes, len("hello")+len("world"))
 	}
 }
