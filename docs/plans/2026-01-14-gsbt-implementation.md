@@ -10,6 +10,26 @@
 
 ---
 
+## 🚨 CRITICAL: Test Requirements
+
+**EVERY task MUST have passing tests before marking as complete:**
+
+1. **Test-First Always:** Write tests BEFORE implementation code
+2. **Verify Failure:** Run tests and confirm they FAIL before implementing
+3. **Verify Success:** Run tests and confirm they PASS after implementing
+4. **No Exceptions:** Do NOT mark a task complete if tests are failing
+5. **Coverage Mandate:** All public functions must have test coverage
+
+**Exit Criteria for Each Task:**
+```bash
+go test ./... -v        # Must show PASS for relevant packages
+go build ./cmd/gsbt/... # Must compile without errors
+```
+
+**If tests fail:** Debug and fix. NEVER claim completion with failing tests.
+
+---
+
 ## Epic 1: Project Setup
 
 ### Task 1.1: Initialize Go Module
