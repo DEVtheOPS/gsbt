@@ -1,0 +1,37 @@
+version: '3'
+
+docs: |
+  Common tasks for gsbt development.
+  Examples:
+    task build
+    task test
+    task run -- --help
+
+vars:
+  GOFLAGS: ''
+
+env:
+  GO111MODULE: on
+
+tasks:
+  build:
+    desc: Build gsbt binary
+    cmds:
+      - go build {{.GOFLAGS}} ./cmd/gsbt
+
+  test:
+    desc: Run unit tests
+    cmds:
+      - go test {{.GOFLAGS}} ./...
+
+  run:
+    desc: Run gsbt with arguments (pass args after --)
+    cmds:
+      - go run {{.GOFLAGS}} ./cmd/gsbt {{.CLI_ARGS}}
+    vars:
+      CLI_ARGS: "{{.CLI_ARGS}}"
+
+  tidy:
+    desc: Tidy go module dependencies
+    cmds:
+      - go mod tidy
