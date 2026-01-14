@@ -3,6 +3,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -23,6 +24,12 @@ func resetRootCmd() {
 		Use:   "gsbt",
 		Short: "Gameserver Backup Tool",
 		Long:  `A modular backup tool for game servers supporting FTP, SFTP, and Nitrado.`,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if verbose && quiet {
+				return fmt.Errorf("--verbose and --quiet flags cannot be used together")
+			}
+			return nil
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			// When no subcommand is provided, show help
 			cmd.Help()
@@ -342,5 +349,22 @@ func TestPersistentFlags(t *testing.T) {
 	quietFlag := rootCmd.PersistentFlags().Lookup("quiet")
 	if quietFlag.DefValue != "false" {
 		t.Errorf("quiet default = %q, want %q", quietFlag.DefValue, "false")
+	}
+}
+
+func TestMutuallyExclusiveFlags(t *testing.T) {
+	resetRootCmd()
+	resetFlags()
+
+	rootCmd.SetArgs([]string{"-v", "-q"})
+	err := rootCmd.Execute()
+
+	if err == nil {
+		t.Error("Expected error when using --verbose and --quiet together, got nil")
+	}
+
+	expectedErr := "--verbose and --quiet flags cannot be used together"
+	if err.Error() != expectedErr {
+		t.Errorf("Expected error message %q, got %q", expectedErr, err.Error())
 	}
 }
