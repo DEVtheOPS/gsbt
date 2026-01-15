@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/devtheops/gsbt/internal/config"
 	"github.com/devtheops/gsbt/internal/connector"
@@ -166,6 +167,102 @@ servers:
 	}
 }
 
+func TestRunBackupParallelByDefault(t *testing.T) {
+	resetRootCmd()
+	resetFlags()
+	rootCmd.AddCommand(backupCmd)
+
+	duration := 120 * time.Millisecond
+
+	// Prepare temp config file with two servers
+	cfgYAML := `
+defaults:
+  backup_location: %s
+servers:
+  - name: s1
+    connection:
+      type: ftp
+      host: example.com
+      remote_path: /data
+  - name: s2
+    connection:
+      type: ftp
+      host: example.com
+      remote_path: /data
+`
+
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, "config.yml")
+	os.WriteFile(cfgPath, []byte(fmt.Sprintf(cfgYAML, filepath.Join(tmp, "backups"))), 0o644)
+
+	origNewConnector := newConnector
+	newConnector = func(cfg connector.Config) (connector.Connector, error) {
+		return &sleepConnector{sleep: duration}, nil
+	}
+	defer func() { newConnector = origNewConnector }()
+
+	rootCmd.SetArgs([]string{"backup", "--config", cfgPath})
+
+	start := time.Now()
+	err := rootCmd.Execute()
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+
+	if elapsed > 2*duration { // indicates sequential behavior
+		t.Fatalf("expected parallel backups (<%v), got %v", 2*duration, elapsed)
+	}
+}
+
+func TestRunBackupSequentialFlag(t *testing.T) {
+	resetRootCmd()
+	resetFlags()
+	rootCmd.AddCommand(backupCmd)
+
+	duration := 80 * time.Millisecond
+
+	// Prepare temp config file with two servers
+	cfgYAML := `
+defaults:
+  backup_location: %s
+servers:
+  - name: s1
+    connection:
+      type: ftp
+      host: example.com
+      remote_path: /data
+  - name: s2
+    connection:
+      type: ftp
+      host: example.com
+      remote_path: /data
+`
+
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, "config.yml")
+	os.WriteFile(cfgPath, []byte(fmt.Sprintf(cfgYAML, filepath.Join(tmp, "backups"))), 0o644)
+
+	origNewConnector := newConnector
+	newConnector = func(cfg connector.Config) (connector.Connector, error) {
+		return &sleepConnector{sleep: duration}, nil
+	}
+	defer func() { newConnector = origNewConnector }()
+
+	rootCmd.SetArgs([]string{"backup", "--config", cfgPath, "--sequential"})
+
+	start := time.Now()
+	err := rootCmd.Execute()
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+
+	if elapsed < 2*duration { // parallel would complete close to duration
+		t.Fatalf("expected sequential backups (>%v), got %v", 2*duration, elapsed)
+	}
+}
+
 // mockSuccessConnector implements connector.Connector for CLI integration test
 type mockSuccessConnector struct{}
 
@@ -182,6 +279,26 @@ func (m *mockSuccessConnector) Upload(ctx context.Context, r io.Reader, remotePa
 }
 func (m *mockSuccessConnector) Close() error { return nil }
 func (m *mockSuccessConnector) Name() string { return "mock" }
+
+// sleepConnector simulates work to test parallel vs sequential execution
+type sleepConnector struct{ sleep time.Duration }
+
+func (s *sleepConnector) Connect(ctx context.Context) error { return nil }
+func (s *sleepConnector) List(ctx context.Context) ([]connector.FileInfo, error) {
+	return []connector.FileInfo{{Path: "file.txt"}}, nil
+}
+func (s *sleepConnector) Download(ctx context.Context, remotePath string, w io.Writer) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(s.sleep):
+		_, _ = w.Write([]byte("data"))
+		return nil
+	}
+}
+func (s *sleepConnector) Upload(ctx context.Context, r io.Reader, remotePath string) error { return nil }
+func (s *sleepConnector) Close() error { return nil }
+func (s *sleepConnector) Name() string { return "sleep" }
 
 // TestBackupCommandHelp tests backup command help
 func TestBackupCommandHelp(t *testing.T) {

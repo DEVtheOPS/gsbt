@@ -78,6 +78,10 @@ servers:
 		t.Errorf("expected backup_location /srv/backups/, got %s", cfg.Defaults.BackupLocation)
 	}
 
+	if cfg.Servers[0].GetBackupLocation(cfg.Defaults) != filepath.Join(cfg.Defaults.BackupLocation, "test") {
+		t.Errorf("expected derived backup_location %s, got %s", filepath.Join(cfg.Defaults.BackupLocation, "test"), cfg.Servers[0].GetBackupLocation(cfg.Defaults))
+	}
+
 	if len(cfg.Servers) != 1 {
 		t.Fatalf("expected 1 server, got %d", len(cfg.Servers))
 	}

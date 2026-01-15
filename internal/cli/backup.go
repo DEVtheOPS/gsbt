@@ -2,16 +2,17 @@
 package cli
 
 import (
-	"context"
-	"fmt"
-	"time"
+    "context"
+    "fmt"
+    "sync"
+    "time"
 
-	"github.com/devtheops/gsbt/internal/backup"
-	"github.com/devtheops/gsbt/internal/config"
-	"github.com/devtheops/gsbt/internal/connector"
-	"github.com/devtheops/gsbt/internal/log"
-	"github.com/devtheops/gsbt/internal/progress"
-	"github.com/spf13/cobra"
+    "github.com/devtheops/gsbt/internal/backup"
+    "github.com/devtheops/gsbt/internal/config"
+    "github.com/devtheops/gsbt/internal/connector"
+    "github.com/devtheops/gsbt/internal/log"
+    "github.com/devtheops/gsbt/internal/progress"
+    "github.com/spf13/cobra"
 )
 
 var (
@@ -73,62 +74,95 @@ func runBackup(ctx context.Context, cmd *cobra.Command) error {
 		return fmt.Errorf("no servers configured")
 	}
 
-	// Currently always sequential; flag kept for future parallel support
-	_ = backupSequential
+    successes := 0
+    failures := 0
 
-	successes := 0
-	failures := 0
+    type result struct {
+        success bool
+        err     error
+    }
 
-	for _, srv := range servers {
-		serverLogger := logger.WithPrefix(fmt.Sprintf("[bold][cyan]%s[/cyan][/bold]", srv.Name))
-		serverLogger.Info("[yellow]starting backup[/yellow]")
+    runOne := func(srv config.Server) result {
+        serverLogger := logger.WithPrefix(fmt.Sprintf("[bold][cyan]%s[/cyan][/bold]", srv.Name))
+        serverLogger.Info("[yellow]starting backup[/yellow]")
 
-		connCfg, err := toConnectorConfig(srv, cfg.Defaults)
-		if err != nil {
-			failures++
-			serverLogger.Error(fmt.Sprintf("[red]config error:[/red] %v", err))
-			continue
-		}
+        connCfg, err := toConnectorConfig(srv, cfg.Defaults)
+        if err != nil {
+            serverLogger.Error(fmt.Sprintf("[red]config error:[/red] %v", err))
+            return result{err: err}
+        }
 
-		conn, err := newConnector(connCfg)
-		if err != nil {
-			failures++
-			serverLogger.Error(fmt.Sprintf("[red]init error:[/red] %v", err))
-			continue
-		}
+        conn, err := newConnector(connCfg)
+        if err != nil {
+            serverLogger.Error(fmt.Sprintf("[red]init error:[/red] %v", err))
+            return result{err: err}
+        }
 
-		mgr := backup.Manager{
-			BackupLocation: srv.GetBackupLocation(cfg.Defaults),
-			TempDir:        cfg.Defaults.TempDir,
-			Progress:       progress.New(serverLogger, GetOutputFormat()),
-		}
+        mgr := backup.Manager{
+            BackupLocation: srv.GetBackupLocation(cfg.Defaults),
+            TempDir:        cfg.Defaults.TempDir,
+            Progress:       progress.New(serverLogger, GetOutputFormat()),
+        }
 
-		start := time.Now()
-		archivePath, stats, err := mgr.Backup(ctx, conn)
-		if err != nil {
-			failures++
-			serverLogger.Error(fmt.Sprintf("[red]backup failed:[/red] %v", err))
-			continue
-		}
+        start := time.Now()
+        archivePath, stats, err := mgr.Backup(ctx, conn)
+        if err != nil {
+            serverLogger.Error(fmt.Sprintf("[red]backup failed:[/red] %v", err))
+            return result{err: err}
+        }
 
-		successes++
-		serverLogger.Info(fmt.Sprintf("[green]saved[/green] %s (%d files, %.1f MB, %.1fs)",
-			archivePath, stats.Files, float64(stats.Bytes)/1e6, time.Since(start).Seconds()),
-			log.Meta{
-				"archive_path": archivePath,
-				"files":        stats.Files,
-				"bytes":        stats.Bytes,
-				"duration_sec": time.Since(start).Seconds(),
-			})
-	}
+        serverLogger.Info(fmt.Sprintf("[green]saved[/green] %s (%d files, %.1f MB, %.1fs)",
+            archivePath, stats.Files, float64(stats.Bytes)/1e6, time.Since(start).Seconds()),
+            log.Meta{
+                "archive_path": archivePath,
+                "files":        stats.Files,
+                "bytes":        stats.Bytes,
+                "duration_sec": time.Since(start).Seconds(),
+            })
 
-	if failures > 0 {
-		return fmt.Errorf("backup complete with failures: %d success, %d failed", successes, failures)
-	}
+        return result{success: true}
+    }
 
-	logger.Info(fmt.Sprintf("[bold][green]backup complete[/green][/bold] (%d success)", successes))
+    if backupSequential || len(servers) == 1 {
+        for _, srv := range servers {
+            res := runOne(srv)
+            if res.success {
+                successes++
+            } else {
+                failures++
+            }
+        }
+    } else {
+        var wg sync.WaitGroup
+        results := make(chan result, len(servers))
 
-	return nil
+        for _, srv := range servers {
+            srv := srv
+            wg.Add(1)
+            go func() {
+                defer wg.Done()
+                results <- runOne(srv)
+            }()
+        }
+
+        wg.Wait()
+        close(results)
+        for res := range results {
+            if res.success {
+                successes++
+            } else {
+                failures++
+            }
+        }
+    }
+
+    if failures > 0 {
+        return fmt.Errorf("backup complete with failures: %d success, %d failed", successes, failures)
+    }
+
+    logger.Info(fmt.Sprintf("[bold][green]backup complete[/green][/bold] (%d success)", successes))
+
+    return nil
 }
 
 func toConnectorConfig(s config.Server, defaults config.Defaults) (connector.Config, error) {
