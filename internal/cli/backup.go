@@ -9,6 +9,8 @@ import (
 	"github.com/devtheops/gsbt/internal/backup"
 	"github.com/devtheops/gsbt/internal/config"
 	"github.com/devtheops/gsbt/internal/connector"
+	"github.com/devtheops/gsbt/internal/log"
+	"github.com/devtheops/gsbt/internal/progress"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +39,12 @@ func init() {
 }
 
 func runBackup(ctx context.Context, cmd *cobra.Command) error {
+	// Setup logger
+	logger := log.NewWithWriters(cmd.OutOrStdout(), cmd.ErrOrStderr())
+	logger.SetOutputFormat(GetOutputFormat())
+	logger.SetQuiet(IsQuiet())
+	logger.SetVerbose(IsVerbose())
+
 	cfgPath, err := config.FindConfigFile(GetConfigFile())
 	if err != nil {
 		return err
@@ -72,54 +80,53 @@ func runBackup(ctx context.Context, cmd *cobra.Command) error {
 	failures := 0
 
 	for _, srv := range servers {
-		if IsQuiet() {
-			// no log
-		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "[%s] starting backup\n", srv.Name)
-		}
+		serverLogger := logger.WithPrefix(fmt.Sprintf("[bold][cyan]%s[/cyan][/bold]", srv.Name))
+		serverLogger.Info("[yellow]starting backup[/yellow]")
 
 		connCfg, err := toConnectorConfig(srv, cfg.Defaults)
 		if err != nil {
 			failures++
-			fmt.Fprintf(cmd.ErrOrStderr(), "[%s] config error: %v\n", srv.Name, err)
+			serverLogger.Error(fmt.Sprintf("[red]config error:[/red] %v", err))
 			continue
 		}
 
 		conn, err := newConnector(connCfg)
 		if err != nil {
 			failures++
-			fmt.Fprintf(cmd.ErrOrStderr(), "[%s] init error: %v\n", srv.Name, err)
+			serverLogger.Error(fmt.Sprintf("[red]init error:[/red] %v", err))
 			continue
 		}
 
 		mgr := backup.Manager{
 			BackupLocation: srv.GetBackupLocation(cfg.Defaults),
 			TempDir:        cfg.Defaults.TempDir,
-			Progress:       newProgressReporter(cmd),
+			Progress:       progress.New(serverLogger, GetOutputFormat()),
 		}
 
 		start := time.Now()
 		archivePath, stats, err := mgr.Backup(ctx, conn)
 		if err != nil {
 			failures++
-			fmt.Fprintf(cmd.ErrOrStderr(), "[%s] backup failed: %v\n", srv.Name, err)
+			serverLogger.Error(fmt.Sprintf("[red]backup failed:[/red] %v", err))
 			continue
 		}
 
 		successes++
-		if !IsQuiet() {
-			fmt.Fprintf(cmd.OutOrStdout(), "[%s] saved %s (%d files, %.1f MB, %.1fs)\n",
-				srv.Name, archivePath, stats.Files, float64(stats.Bytes)/1e6, time.Since(start).Seconds())
-		}
+		serverLogger.Info(fmt.Sprintf("[green]saved[/green] %s (%d files, %.1f MB, %.1fs)",
+			archivePath, stats.Files, float64(stats.Bytes)/1e6, time.Since(start).Seconds()),
+			log.Meta{
+				"archive_path": archivePath,
+				"files":        stats.Files,
+				"bytes":        stats.Bytes,
+				"duration_sec": time.Since(start).Seconds(),
+			})
 	}
 
 	if failures > 0 {
 		return fmt.Errorf("backup complete with failures: %d success, %d failed", successes, failures)
 	}
 
-	if !IsQuiet() {
-		fmt.Fprintf(cmd.OutOrStdout(), "backup complete (%d success)\n", successes)
-	}
+	logger.Info(fmt.Sprintf("[bold][green]backup complete[/green][/bold] (%d success)", successes))
 
 	return nil
 }

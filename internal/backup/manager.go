@@ -10,22 +10,14 @@ import (
 	"time"
 
 	"github.com/devtheops/gsbt/internal/connector"
+	"github.com/devtheops/gsbt/internal/progress"
 )
-
-// ProgressReporter receives progress events from a backup run. All methods are optional.
-type ProgressReporter interface {
-	Start(totalBytes int64, fileCount int)
-	FileStart(name string, size int64)
-	FileProgress(name string, written int64, size int64)
-	FileDone(name string)
-	Message(msg string)
-}
 
 // Manager coordinates backup operations for a single server.
 type Manager struct {
 	TempDir        string
 	BackupLocation string
-	Progress       ProgressReporter
+	Progress       progress.Reporter
 }
 
 // Stats represents a summary of a backup run.
@@ -118,6 +110,10 @@ func (m *Manager) Backup(ctx context.Context, conn connector.Connector) (string,
 		if m.Progress != nil {
 			m.Progress.FileDone(file.Path)
 		}
+	}
+
+	if m.Progress != nil {
+		m.Progress.Close()
 	}
 
 	// Build archive path
