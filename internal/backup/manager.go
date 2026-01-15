@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/digitalfiz/gsbt/internal/connector"
+	"github.com/devtheops/gsbt/internal/connector"
 )
 
 // ProgressReporter receives progress events from a backup run. All methods are optional.
