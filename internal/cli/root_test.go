@@ -36,7 +36,7 @@ func resetRootCmd() {
 		},
 	}
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file path")
-	rootCmd.PersistentFlags().StringVar(&outputFmt, "output", "text", "output format (text, json)")
+	rootCmd.PersistentFlags().StringVar(&outputFmt, "output", "text", "output format (text, json, rich)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "suppress non-error output")
 }
