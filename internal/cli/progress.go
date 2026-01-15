@@ -51,14 +51,14 @@ func (p *simpleProgress) FileDone(name string) { fmt.Fprintf(p.out, "  done %s\n
 func (p *simpleProgress) Close()               {}
 
 type richProgress struct {
-	w        io.Writer
-	mpb      progressbar.MultiPB
-	updates  chan int64
-	total    int64
-	current  int64
-	fileBase int64
-	barIdx   int
-	lastTick time.Time
+	w           io.Writer
+	mpb         progressbar.MultiPB
+	updates     chan int64
+	total       int64
+	current     int64
+	fileWritten int64
+	barIdx      int
+	lastTick    time.Time
 }
 
 func newRichProgress(w io.Writer) *richProgress {
@@ -100,7 +100,7 @@ func (r *richProgress) Start(totalBytes int64, fileCount int) {
 }
 
 func (r *richProgress) FileStart(name string, size int64) {
-	r.fileBase = r.current
+	r.fileWritten = 0
 	r.lastTick = time.Time{}
 	if bar := r.mpb.Bar(r.barIdx); bar != nil {
 		bar.SetAppendText(" " + truncate(name, 30))
@@ -111,8 +111,7 @@ func (r *richProgress) FileProgress(name string, written int64, size int64) {
 	if r.updates == nil {
 		return
 	}
-	totalNow := r.fileBase + written
-	delta := totalNow - r.current
+	delta := written - r.fileWritten
 	if delta <= 0 {
 		return
 	}
@@ -121,25 +120,20 @@ func (r *richProgress) FileProgress(name string, written int64, size int64) {
 		return
 	}
 	r.lastTick = time.Now()
+	r.fileWritten += delta
 	r.current += delta
 	r.updates <- delta
 }
 
 func (r *richProgress) FileDone(name string) {
-	// ensure we advance to file end
-	if r.fileBase > 0 && r.current < r.fileBase {
-		delta := r.fileBase - r.current
-		r.current += delta
-		r.updates <- delta
-	}
-	if r.updates != nil {
-		close(r.updates)
-		r.updates = nil
-	}
 }
 
 func (r *richProgress) Close() {
 	if r.mpb != nil {
+		if r.updates != nil {
+			close(r.updates)
+			r.updates = nil
+		}
 		r.mpb.Close()
 	}
 }
