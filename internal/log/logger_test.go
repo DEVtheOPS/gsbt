@@ -88,6 +88,52 @@ func TestLoggerWithPrefix(t *testing.T) {
 	}
 }
 
+func TestLoggerWithPrefixMarkup(t *testing.T) {
+	var out bytes.Buffer
+	logger := NewWithWriters(&out, &out)
+
+	// Test rich mode - prefix markup should render to ANSI
+	logger.SetOutputFormat("rich")
+	prefixed := logger.WithPrefix("[bold][cyan]server[/cyan][/bold]")
+	prefixed.Info("[green]message[/green]")
+
+	output := out.String()
+	if !strings.Contains(output, "\033[") {
+		t.Errorf("expected ANSI codes in rich mode prefix, got: %s", output)
+	}
+	if strings.Contains(output, "[bold]") || strings.Contains(output, "[cyan]") {
+		t.Errorf("expected markup stripped in rich mode, got: %s", output)
+	}
+
+	// Test text mode - prefix markup should be stripped
+	out.Reset()
+	logger.SetOutputFormat("text")
+	prefixed = logger.WithPrefix("[bold][cyan]server[/cyan][/bold]")
+	prefixed.Info("[green]message[/green]")
+
+	output = out.String()
+	if strings.Contains(output, "[bold]") || strings.Contains(output, "[cyan]") {
+		t.Errorf("expected markup stripped in text mode, got: %s", output)
+	}
+	if !strings.Contains(output, "server") {
+		t.Errorf("expected stripped prefix text, got: %s", output)
+	}
+
+	// Test JSON mode - prefix markup should be stripped
+	out.Reset()
+	logger.SetOutputFormat("json")
+	prefixed = logger.WithPrefix("[bold][cyan]server[/cyan][/bold]")
+	prefixed.Info("message")
+
+	var entry map[string]interface{}
+	if err := json.Unmarshal(out.Bytes(), &entry); err != nil {
+		t.Fatalf("expected valid JSON, got error: %v", err)
+	}
+	if prefix, ok := entry["prefix"].(string); !ok || strings.Contains(prefix, "[") {
+		t.Errorf("expected stripped prefix in JSON, got: %v", entry["prefix"])
+	}
+}
+
 func TestLoggerQuietMode(t *testing.T) {
 	var out, errOut bytes.Buffer
 	logger := NewWithWriters(&out, &errOut)
