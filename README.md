@@ -87,7 +87,7 @@ gsbt backup --quiet
 - `--output <mode>` – Output format: `text` (default), `rich` (colors/progress), `json` (structured)
 - `--verbose` / `-v` – Enable debug logging and show metadata
 - `--quiet` / `-q` – Only show errors
-- `--sequential` – Reserved; currently backups run sequentially
+- `--sequential` – Run backups one server at a time (default is parallel)
 
 Archives are stored at `{backup_location}/{timestamp}.tar.gz` with temp files under `{backup_location}/.tmp/`.
 

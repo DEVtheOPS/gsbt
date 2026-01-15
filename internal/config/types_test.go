@@ -17,6 +17,7 @@ defaults:
 servers:
   - name: test-server
     description: Test Server
+    backup_location: /custom/location
     connection:
       type: ftp
       host: localhost
@@ -40,6 +41,10 @@ servers:
 
 	if cfg.Servers[0].Name != "test-server" {
 		t.Errorf("expected server name test-server, got %s", cfg.Servers[0].Name)
+	}
+
+	if cfg.Servers[0].GetBackupLocation(cfg.Defaults) != "/custom/location" {
+		t.Errorf("expected server backup_location override /custom/location, got %s", cfg.Servers[0].GetBackupLocation(cfg.Defaults))
 	}
 
 	if cfg.Servers[0].Connection.Type != "ftp" {
