@@ -1,0 +1,41 @@
+project_name: gsbt
+
+before:
+  hooks:
+    - go test ./...
+
+builds:
+  - id: gsbt
+    main: ./cmd/gsbt
+    binary: gsbt
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/digitalfiz/gsbt/internal/version.Version={{.Version}}
+      - -X github.com/digitalfiz/gsbt/internal/version.Commit={{.FullCommit}}
+      - -X github.com/digitalfiz/gsbt/internal/version.BuildDate={{.Date}}
+    env:
+      - CGO_ENABLED=0
+
+archives:
+  - id: gsbt-archive
+    builds: [gsbt]
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{.ProjectName}}_{{.Version}}_{{.Os}}_{{.Arch}}"
+
+checksum:
+  name_template: "{{.ProjectName}}_{{.Version}}_checksums.txt"
+
+release:
+  draft: false
+  prerelease: false
+
+changelog:
+  sort: desc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^chore:'
