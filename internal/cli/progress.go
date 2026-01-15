@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hedzr/progressbar"
 	"github.com/spf13/cobra"
 )
 
@@ -18,11 +19,16 @@ type progressReporter interface {
 	FileStart(name string, size int64)
 	FileProgress(name string, written int64, size int64)
 	FileDone(name string)
+	Close()
 }
 
 func newProgressReporter(cmd *cobra.Command) progressReporter {
-	if backupRich && !IsQuiet() && isTTY(cmd.OutOrStdout()) {
-		return &richProgress{w: cmd.OutOrStdout()}
+	format := GetOutputFormat()
+	if format == "json" || IsQuiet() {
+		return nil
+	}
+	if format == "rich" && isTTY(cmd.OutOrStdout()) {
+		return newRichProgress(cmd.OutOrStdout())
 	}
 	return &simpleProgress{out: cmd.OutOrStdout(), err: cmd.ErrOrStderr()}
 }
@@ -43,46 +49,82 @@ func (p *simpleProgress) FileProgress(name string, written int64, size int64) {
 	// keep quiet to avoid spam; only rich mode streams progress
 }
 func (p *simpleProgress) FileDone(name string) { fmt.Fprintf(p.out, "  done %s\n", name) }
+func (p *simpleProgress) Close()               {}
 
 type richProgress struct {
-	w       io.Writer
-	total   int64
-	current int64
-	last    time.Time
+	w        io.Writer
+	mpb      progressbar.MultiPB
+	updates  chan int64
+	last     int64
+	barIdx   int
+	lastTick time.Time
+}
+
+func newRichProgress(w io.Writer) *richProgress {
+	mpb := progressbar.New(progressbar.WithOutputDevice(w))
+	return &richProgress{w: w, mpb: mpb}
 }
 
 func (r *richProgress) Message(msg string) { fmt.Fprintf(r.w, "\r%s\n", msg) }
 
 func (r *richProgress) Start(totalBytes int64, fileCount int) {
-	r.total = totalBytes
 	fmt.Fprintf(r.w, "\rStarting backup: %d files, %.1f MB\n", fileCount, float64(totalBytes)/1e6)
 }
 
 func (r *richProgress) FileStart(name string, size int64) {
-	r.render(name, 0, size)
+	r.last = 0
+	r.lastTick = time.Time{}
+	desc := truncate(name, 30)
+	r.updates = make(chan int64, 32)
+	r.barIdx = r.mpb.Add(size, desc,
+		progressbar.WithBarWidth(30),
+		progressbar.WithBarStepper(0),
+		progressbar.WithBarOnCompleted(func(pb progressbar.PB) {
+			fmt.Fprintln(r.w)
+		}),
+		progressbar.WithBarWorker(func(pb progressbar.PB, exit <-chan struct{}) (stop bool) {
+			for {
+				select {
+				case d, ok := <-r.updates:
+					if !ok {
+						return true
+					}
+					pb.Step(d)
+				case <-exit:
+					return true
+				}
+			}
+		}),
+	)
 }
 
 func (r *richProgress) FileProgress(name string, written int64, size int64) {
-	// throttle rendering to ~20fps
-	if time.Since(r.last) < 50*time.Millisecond {
+	if r.updates == nil {
 		return
 	}
-	r.last = time.Now()
-	r.render(name, written, size)
+	// throttle rendering to ~20fps
+	if time.Since(r.lastTick) < 50*time.Millisecond {
+		return
+	}
+	r.lastTick = time.Now()
+	delta := written - r.last
+	if delta > 0 {
+		r.updates <- delta
+		r.last = written
+	}
 }
 
 func (r *richProgress) FileDone(name string) {
-	r.render(name, 1, 1)
-	fmt.Fprintf(r.w, "\n")
+	if r.updates != nil {
+		close(r.updates)
+		r.updates = nil
+	}
 }
 
-func (r *richProgress) render(name string, written int64, size int64) {
-	percent := 0.0
-	if size > 0 {
-		percent = float64(written) / float64(size) * 100
+func (r *richProgress) Close() {
+	if r.mpb != nil {
+		r.mpb.Close()
 	}
-	bar := progressBar(percent, 30)
-	fmt.Fprintf(r.w, "\r%-40s %s %5.1f%%", truncate(name, 36), bar, percent)
 }
 
 func progressBar(percent float64, width int) string {
