@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/digitalfiz/gsbt/internal/version"
+	"github.com/devtheops/gsbt/internal/version"
 )
 
 func TestVersionCommand(t *testing.T) {

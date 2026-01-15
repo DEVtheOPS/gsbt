@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/digitalfiz/gsbt/internal/backup"
-	"github.com/digitalfiz/gsbt/internal/config"
-	"github.com/digitalfiz/gsbt/internal/connector"
+	"github.com/devtheops/gsbt/internal/backup"
+	"github.com/devtheops/gsbt/internal/config"
+	"github.com/devtheops/gsbt/internal/connector"
 	"github.com/spf13/cobra"
 )
 

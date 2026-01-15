@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/digitalfiz/gsbt/internal/version"
+	"github.com/devtheops/gsbt/internal/version"
 	"github.com/spf13/cobra"
 )
 

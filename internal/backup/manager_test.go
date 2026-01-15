@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/digitalfiz/gsbt/internal/connector"
+	"github.com/devtheops/gsbt/internal/connector"
 )
 
 // mockConnector is a simple in-memory connector for tests.

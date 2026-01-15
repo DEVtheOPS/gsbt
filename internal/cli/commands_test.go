@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/digitalfiz/gsbt/internal/config"
-	"github.com/digitalfiz/gsbt/internal/connector"
+	"github.com/devtheops/gsbt/internal/config"
+	"github.com/devtheops/gsbt/internal/connector"
 )
 
 // TestBackupCommandMetadata tests backup command structure
