@@ -3,10 +3,15 @@
 CLI tool to back up gameserver files via pluggable connectors (FTP, SFTP, Nitrado → FTP) into timestamped `.tar.gz` archives.
 
 ## Features (current state)
-- Connectors: FTP, SFTP, Nitrado (fetches FTP creds via API).
-- Backup command downloads matched files, archives them, and stores per-server backups with timestamps.
-- Progress options: `text` (default), `rich` (single live bar per server, TTY), `json` (quiet machine output).
-- Config discovery: `--config` > `$GSBT_CONFIG` > `./.gsbt-config.yml` > `~/.config/gsbt/config.yml`.
+- **Connectors**: FTP, SFTP, Nitrado (fetches FTP creds via API)
+- **Backup command** downloads matched files, archives them, and stores per-server backups with timestamps
+- **Output modes**:
+  - `text` (default): Plain text with colors stripped
+  - `rich`: Color-coded output with progress bars (TTY only)
+  - `json`: Structured JSON for programmatic consumption
+- **Rich markup**: Supports `[bold]`, `[green]`, `[red]`, `[cyan]`, `[yellow]` tags in messages
+- **Metadata**: Optional structured context data (shown in verbose mode or JSON)
+- **Config discovery**: `--config` > `$GSBT_CONFIG` > `./.gsbt-config.yml` > `~/.config/gsbt/config.yml`
 
 > Note: Prune/list/restore commands are stubbed; only `backup` is functional right now.
 
@@ -17,7 +22,7 @@ Download binaries from GitHub Releases (published via GoReleaser when tagging `v
 
 ### From source
 ```bash
-go install github.com/digitalfiz/gsbt/cmd/gsbt@latest
+go install github.com/devtheops/gsbt/cmd/gsbt@latest
 ```
 Or build locally:
 ```bash
@@ -58,25 +63,105 @@ servers:
 
 ### Run a backup
 ```bash
-gsbt backup --config /path/to/config.yml
+# Basic usage
+gsbt backup
+
+# Backup single server
+gsbt backup --server my-ftp
+
+# Rich output with colors and progress bar
+gsbt backup --output rich
+
+# JSON output for scripts
+gsbt backup --output json
+
+# Verbose mode (shows debug logs and metadata)
+gsbt backup --verbose
+
+# Quiet mode (errors only)
+gsbt backup --quiet
 ```
-Options:
-- `--server name` – target a single server.
-- `--output rich` – live progress bar (TTY only). `text` (default) or `json` also available.
-- `--sequential` – reserved; currently backups run sequentially.
+
+**Options:**
+- `--server name` – Target a single server
+- `--output <mode>` – Output format: `text` (default), `rich` (colors/progress), `json` (structured)
+- `--verbose` / `-v` – Enable debug logging and show metadata
+- `--quiet` / `-q` – Only show errors
+- `--sequential` – Reserved; currently backups run sequentially
 
 Archives are stored at `{backup_location}/{timestamp}.tar.gz` with temp files under `{backup_location}/.tmp/`.
+
+### Output Modes
+
+**Text mode** (default):
+```
+[server-name] starting backup
+Files: 5, Total: 2.3 MB
+- saves/world.dat (1.2 MB)
+- config/server.ini (0.1 MB)
+[server-name] saved /backups/2026-01-15_154500.tar.gz (5 files, 2.3 MB, 3.2s)
+```
+
+**Rich mode** (`--output rich`):
+- Color-coded messages (cyan server names, yellow status, green success, red errors)
+- Live progress bar for file downloads
+- Requires TTY (terminal)
+
+**JSON mode** (`--output json`):
+```json
+{"timestamp":"2026-01-15T15:45:00Z","level":"info","message":"starting backup","prefix":"server-name"}
+{"timestamp":"2026-01-15T15:45:03Z","level":"info","message":"saved /backups/2026-01-15_154500.tar.gz","prefix":"server-name","metadata":{"archive_path":"/backups/2026-01-15_154500.tar.gz","files":5,"bytes":2400000,"duration_sec":3.2}}
+```
 
 ### Notes on Nitrado
 - Provide `service_id` and an API key (`connection.api_key` or `defaults.nitrado_api_key`).
 - Connector fetches FTP creds then reuses the FTP pipeline.
 
 ## Development
-- Tests: `go test ./...`
-- Taskfile: `task build`, `task test`, `task run -- --help`
-- Release: tag `vX.Y.Z`; GitHub Actions will build/publish via GoReleaser.
+
+### Quick Start
+
+- **Tests**: `go test ./...`
+- **Taskfile**: `task build`, `task test`, `task run -- --help`
+- **Release**: tag `vX.Y.Z`; GitHub Actions will build/publish via GoReleaser
+
+### Architecture
+
+**Packages:**
+
+- `internal/log` - Standardized logging with Rich-inspired markup
+  - Three modes: text (plain), rich (ANSI colors), json (structured)
+  - Markup tags: `[bold]`, `[green]`, `[red]`, `[cyan]`, `[yellow]`, `[dim]`, etc.
+  - Metadata support for structured context
+- `internal/progress` - Progress reporting interface
+  - `nullProgress` (quiet/json), `simpleProgress` (text), `richProgress` (animated)
+  - Integrates with logger for consistency
+- `internal/connector` - Pluggable connector interface
+  - FTP, SFTP, Nitrado implementations
+  - Pattern matching for include/exclude
+- `internal/backup` - Backup orchestration
+  - Archive creation, download management
+  - Progress reporting integration
+- `internal/config` - Configuration loading
+  - YAML parsing, env var substitution
+  - Config file discovery
+
+**Adding a new connector:**
+
+1. Implement `connector.Connector` interface
+2. Add factory case in `connector.NewConnector()`
+3. Follow existing patterns (FTP, SFTP examples)
+
+**Adding markup to logs:**
+
+```go
+logger.Info("[green]Success![/green] Operation completed")
+logger.Error("[red]Failed:[/red] %v", err)
+logger.Debug("Processing [cyan]%s[/cyan]", filename)
+```
 
 ## Roadmap
+
 - Implement prune/list/restore commands
 - Parallel backups with multi-bar rich output
 - Retry/backoff polish and integration tests
