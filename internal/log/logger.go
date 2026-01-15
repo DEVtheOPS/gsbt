@@ -197,7 +197,7 @@ func (l *Logger) writeJSON(w io.Writer, level Level, msg string, meta Meta) {
 	}
 
 	if l.prefix != "" {
-		entry["prefix"] = l.prefix
+		entry["prefix"] = stripMarkup(l.prefix)
 	}
 
 	if meta != nil && len(meta) > 0 {
@@ -213,7 +213,7 @@ func (l *Logger) writeRich(w io.Writer, level Level, msg string, meta Meta) {
 	rendered := renderMarkup(msg)
 
 	if l.prefix != "" {
-		fmt.Fprintf(w, "%s %s\n", l.prefix, rendered)
+		fmt.Fprintf(w, "%s %s\n", renderMarkup(l.prefix), rendered)
 	} else {
 		fmt.Fprintln(w, rendered)
 	}
@@ -231,7 +231,7 @@ func (l *Logger) writeText(w io.Writer, level Level, msg string, meta Meta) {
 	plain := stripMarkup(msg)
 
 	if l.prefix != "" {
-		fmt.Fprintf(w, "%s %s\n", l.prefix, plain)
+		fmt.Fprintf(w, "%s %s\n", stripMarkup(l.prefix), plain)
 	} else {
 		fmt.Fprintln(w, plain)
 	}
