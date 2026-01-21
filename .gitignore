@@ -3,3 +3,4 @@ coverage.out
 gsbt
 .gsbt-config.yml
 gameserver_backups/
+dist/
