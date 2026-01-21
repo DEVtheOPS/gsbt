@@ -6,10 +6,8 @@ CLI tool to back up gameserver files via pluggable connectors (FTP, SFTP, Nitrad
 - **Connectors**: FTP, SFTP, Nitrado (fetches FTP creds via API)
 - **Backup command** downloads matched files, archives them, and stores per-server backups with timestamps
 - **Output modes**:
-  - `text` (default): Plain text with colors stripped
-  - `rich`: Color-coded output with progress bars (TTY only)
+  - `text` (default): Plain text
   - `json`: Structured JSON for programmatic consumption
-- **Rich markup**: Supports `[bold]`, `[green]`, `[red]`, `[cyan]`, `[yellow]` tags in messages
 - **Metadata**: Optional structured context data (shown in verbose mode or JSON)
 - **Config discovery**: `--config` > `$GSBT_CONFIG` > `./.gsbt-config.yml` > `~/.config/gsbt/config.yml`
 
@@ -69,9 +67,6 @@ gsbt backup
 # Backup single server
 gsbt backup --server my-ftp
 
-# Rich output with colors and progress bar
-gsbt backup --output rich
-
 # JSON output for scripts
 gsbt backup --output json
 
@@ -84,7 +79,7 @@ gsbt backup --quiet
 
 **Options:**
 - `--server name` – Target a single server
-- `--output <mode>` – Output format: `text` (default), `rich` (colors/progress), `json` (structured)
+- `--output <mode>` – Output format: `text` (default), `json` (structured)
 - `--verbose` / `-v` – Enable debug logging and show metadata
 - `--quiet` / `-q` – Only show errors
 - `--sequential` – Run backups one server at a time (default is parallel)
@@ -101,11 +96,6 @@ Files: 5, Total: 2.3 MB
 - config/server.ini (0.1 MB)
 [server-name] saved /backups/2026-01-15_154500.tar.gz (5 files, 2.3 MB, 3.2s)
 ```
-
-**Rich mode** (`--output rich`):
-- Color-coded messages (cyan server names, yellow status, green success, red errors)
-- Live progress bar for file downloads
-- Requires TTY (terminal)
 
 **JSON mode** (`--output json`):
 ```json
@@ -129,12 +119,11 @@ Files: 5, Total: 2.3 MB
 
 **Packages:**
 
-- `internal/log` - Standardized logging with Rich-inspired markup
-  - Three modes: text (plain), rich (ANSI colors), json (structured)
-  - Markup tags: `[bold]`, `[green]`, `[red]`, `[cyan]`, `[yellow]`, `[dim]`, etc.
+- `internal/log` - Standardized logging with markup support (stripped for text/json)
+  - Two modes: text (plain), json (structured)
   - Metadata support for structured context
 - `internal/progress` - Progress reporting interface
-  - `nullProgress` (quiet/json), `simpleProgress` (text), `richProgress` (animated)
+  - `nullProgress` (quiet/json), `simpleProgress` (text)
   - Integrates with logger for consistency
 - `internal/connector` - Pluggable connector interface
   - FTP, SFTP, Nitrado implementations
@@ -154,14 +143,13 @@ Files: 5, Total: 2.3 MB
 
 **Adding markup to logs:**
 
+The logger supports markup tags like `[green]`, but they are currently stripped in all output modes.
+
 ```go
-logger.Info("[green]Success![/green] Operation completed")
-logger.Error("[red]Failed:[/red] %v", err)
-logger.Debug("Processing [cyan]%s[/cyan]", filename)
+logger.Info("[green]Success![/green] Operation completed") // Output: Success! Operation completed
 ```
 
 ## Roadmap
 
 - Implement prune/list/restore commands
-- Parallel backups with multi-bar rich output
 - Retry/backoff polish and integration tests

@@ -28,25 +28,6 @@ func TestLoggerTextMode(t *testing.T) {
 	}
 }
 
-func TestLoggerRichMode(t *testing.T) {
-	var out bytes.Buffer
-	logger := NewWithWriters(&out, &out)
-	logger.SetOutputFormat("rich")
-
-	logger.Info("[green]success[/green]")
-	output := out.String()
-
-	// Should contain ANSI codes
-	if !strings.Contains(output, "\033[") {
-		t.Errorf("expected ANSI codes in rich mode, got: %s", output)
-	}
-
-	// Should contain reset code
-	if !strings.Contains(output, "\033[0m") {
-		t.Errorf("expected reset code in rich mode, got: %s", output)
-	}
-}
-
 func TestLoggerJSONMode(t *testing.T) {
 	var out bytes.Buffer
 	logger := NewWithWriters(&out, &out)
@@ -92,26 +73,13 @@ func TestLoggerWithPrefixMarkup(t *testing.T) {
 	var out bytes.Buffer
 	logger := NewWithWriters(&out, &out)
 
-	// Test rich mode - prefix markup should render to ANSI
-	logger.SetOutputFormat("rich")
+	// Test text mode - prefix markup should be stripped
+	out.Reset()
+	logger.SetOutputFormat("text")
 	prefixed := logger.WithPrefix("[bold][cyan]server[/cyan][/bold]")
 	prefixed.Info("[green]message[/green]")
 
 	output := out.String()
-	if !strings.Contains(output, "\033[") {
-		t.Errorf("expected ANSI codes in rich mode prefix, got: %s", output)
-	}
-	if strings.Contains(output, "[bold]") || strings.Contains(output, "[cyan]") {
-		t.Errorf("expected markup stripped in rich mode, got: %s", output)
-	}
-
-	// Test text mode - prefix markup should be stripped
-	out.Reset()
-	logger.SetOutputFormat("text")
-	prefixed = logger.WithPrefix("[bold][cyan]server[/cyan][/bold]")
-	prefixed.Info("[green]message[/green]")
-
-	output = out.String()
 	if strings.Contains(output, "[bold]") || strings.Contains(output, "[cyan]") {
 		t.Errorf("expected markup stripped in text mode, got: %s", output)
 	}
@@ -235,26 +203,6 @@ func TestStripMarkup(t *testing.T) {
 		result := stripMarkup(tt.input)
 		if result != tt.expected {
 			t.Errorf("stripMarkup(%q) = %q, want %q", tt.input, result, tt.expected)
-		}
-	}
-}
-
-func TestRenderMarkup(t *testing.T) {
-	tests := []struct {
-		input    string
-		contains []string
-	}{
-		{"[bold]text[/bold]", []string{"\033[1m", "text", "\033[0m"}},
-		{"[green]success[/green]", []string{"\033[32m", "success", "\033[0m"}},
-		{"[red]error[/red]", []string{"\033[31m", "error", "\033[0m"}},
-	}
-
-	for _, tt := range tests {
-		result := renderMarkup(tt.input)
-		for _, substr := range tt.contains {
-			if !strings.Contains(result, substr) {
-				t.Errorf("renderMarkup(%q) = %q, expected to contain %q", tt.input, result, substr)
-			}
 		}
 	}
 }
