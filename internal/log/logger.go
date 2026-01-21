@@ -38,15 +38,15 @@ func (l Level) String() string {
 }
 
 // Meta represents structured metadata for log entries
-type Meta map[string]interface{}
+type Meta map[string]interface{ } 
 
-// Logger provides Rich-like structured logging with markup support
+// Logger provides structured logging with markup support (stripped for text/json)
 type Logger struct {
 	out          io.Writer
 	err          io.Writer
 	level        Level
 	prefix       string
-	outputFormat string // "text", "json", "rich"
+	outputFormat string // "text", "json"
 	quiet        bool
 	verbose      bool
 	mu           sync.Mutex
@@ -86,7 +86,7 @@ func (l *Logger) SetErrorOutput(w io.Writer) {
 	l.err = w
 }
 
-// SetOutputFormat sets the output format (text, json, rich)
+// SetOutputFormat sets the output format (text, json)
 func (l *Logger) SetOutputFormat(format string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -182,15 +182,13 @@ func (l *Logger) log(level Level, msg string, meta ...Meta) {
 	switch l.outputFormat {
 	case "json":
 		l.writeJSON(w, level, msg, metadata)
-	case "rich":
-		l.writeRich(w, level, msg, metadata)
 	default: // "text"
 		l.writeText(w, level, msg, metadata)
 	}
 }
 
 func (l *Logger) writeJSON(w io.Writer, level Level, msg string, meta Meta) {
-	entry := map[string]interface{}{
+	entry := map[string]interface{ } {
 		"timestamp": time.Now().Format(time.RFC3339),
 		"level":     level.String(),
 		"message":   stripMarkup(msg),
@@ -206,24 +204,6 @@ func (l *Logger) writeJSON(w io.Writer, level Level, msg string, meta Meta) {
 
 	data, _ := json.Marshal(entry)
 	fmt.Fprintln(w, string(data))
-}
-
-func (l *Logger) writeRich(w io.Writer, level Level, msg string, meta Meta) {
-	// Render ANSI color codes from markup
-	rendered := renderMarkup(msg)
-
-	if l.prefix != "" {
-		fmt.Fprintf(w, "%s %s\n", renderMarkup(l.prefix), rendered)
-	} else {
-		fmt.Fprintln(w, rendered)
-	}
-
-	// Show metadata on second line if verbose
-	if l.verbose && meta != nil && len(meta) > 0 {
-		metaStr := formatMetadata(meta)
-		// Dim gray for metadata
-		fmt.Fprintf(w, "\033[2m%s\033[0m\n", metaStr)
-	}
 }
 
 func (l *Logger) writeText(w io.Writer, level Level, msg string, meta Meta) {
@@ -257,47 +237,7 @@ func (l *Logger) IsVerbose() bool {
 	return l.verbose
 }
 
-// ANSI color codes for rich mode
-var colorMap = map[string]string{
-	"black":   "\033[30m",
-	"red":     "\033[31m",
-	"green":   "\033[32m",
-	"yellow":  "\033[33m",
-	"blue":    "\033[34m",
-	"magenta": "\033[35m",
-	"cyan":    "\033[36m",
-	"white":   "\033[37m",
-	"bold":    "\033[1m",
-	"dim":     "\033[2m",
-	"italic":  "\033[3m",
-	"reset":   "\033[0m",
-}
-
 var markupRegex = regexp.MustCompile(`\[(/?)([a-z]+)\]`)
-
-// renderMarkup converts markup tags to ANSI escape codes
-// [bold]text[/bold] -> \033[1mtext\033[0m
-func renderMarkup(s string) string {
-	return markupRegex.ReplaceAllStringFunc(s, func(match string) string {
-		parts := markupRegex.FindStringSubmatch(match)
-		if len(parts) < 3 {
-			return match
-		}
-
-		closing := parts[1] == "/"
-		tag := parts[2]
-
-		if closing {
-			return colorMap["reset"]
-		}
-
-		if code, ok := colorMap[tag]; ok {
-			return code
-		}
-
-		return match
-	})
-}
 
 // stripMarkup removes all markup tags
 // [bold]text[/bold] -> text

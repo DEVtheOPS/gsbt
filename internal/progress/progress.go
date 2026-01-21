@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/devtheops/gsbt/internal/log"
-	"github.com/hedzr/progressbar"
 )
 
 // Reporter tracks and reports progress for long-running operations
@@ -37,10 +35,6 @@ type Reporter interface {
 func New(logger *log.Logger, format string) Reporter {
 	if logger.IsQuiet() || format == "json" {
 		return &nullProgress{}
-	}
-
-	if format == "rich" && isTTY(os.Stdout) {
-		return newRichProgress(logger)
 	}
 
 	return &simpleProgress{logger: logger}
@@ -82,109 +76,6 @@ func (s *simpleProgress) Message(msg string) {
 }
 
 func (s *simpleProgress) Close() {}
-
-// richProgress renders an animated progress bar using hedzr/progressbar
-type richProgress struct {
-	logger      *log.Logger
-	mpb         progressbar.MultiPB
-	updates     chan int64
-	total       int64
-	current     int64
-	fileWritten int64
-	barIdx      int
-	lastTick    time.Time
-	startTime   time.Time
-}
-
-func newRichProgress(logger *log.Logger) *richProgress {
-	mpb := progressbar.New(progressbar.WithOutputDevice(os.Stdout))
-	return &richProgress{
-		logger: logger,
-		mpb:    mpb,
-	}
-}
-
-func (r *richProgress) Start(totalBytes int64, fileCount int) {
-	if totalBytes <= 0 {
-		totalBytes = 1
-	}
-	r.total = totalBytes
-	r.startTime = time.Now()
-	r.updates = make(chan int64, 128)
-
-	r.barIdx = r.mpb.Add(totalBytes, "backup",
-		progressbar.WithBarWidth(30),
-		progressbar.WithBarStepper(0),
-		progressbar.WithBarOnCompleted(func(pb progressbar.PB) {
-			fmt.Println() // newline after completion
-		}),
-		progressbar.WithBarWorker(func(pb progressbar.PB, exit <-chan struct{}) (stop bool) {
-			for {
-				select {
-				case d, ok := <-r.updates:
-					if !ok {
-						return true
-					}
-					if d > 0 {
-						pb.Step(d)
-					}
-				case <-exit:
-					return true
-				}
-			}
-		}),
-	)
-
-	r.logger.Info(fmt.Sprintf("Starting backup: %d files, %.1f MB", fileCount, float64(totalBytes)/1e6))
-}
-
-func (r *richProgress) FileStart(name string, size int64) {
-	r.fileWritten = 0
-	r.lastTick = time.Time{}
-
-	if bar := r.mpb.Bar(r.barIdx); bar != nil {
-		bar.SetAppendText(" " + truncate(name, 30))
-	}
-}
-
-func (r *richProgress) FileProgress(name string, written int64, size int64) {
-	if r.updates == nil {
-		return
-	}
-
-	delta := written - r.fileWritten
-	if delta <= 0 {
-		return
-	}
-
-	// Throttle rendering to ~20fps to avoid spam
-	if time.Since(r.lastTick) < 50*time.Millisecond {
-		return
-	}
-
-	r.lastTick = time.Now()
-	r.fileWritten += delta
-	r.current += delta
-	r.updates <- delta
-}
-
-func (r *richProgress) FileDone(name string) {
-	// Progress bar shows overall completion
-}
-
-func (r *richProgress) Message(msg string) {
-	fmt.Fprintf(os.Stdout, "\r%s\n", msg)
-}
-
-func (r *richProgress) Close() {
-	if r.mpb != nil {
-		if r.updates != nil {
-			close(r.updates)
-			r.updates = nil
-		}
-		r.mpb.Close()
-	}
-}
 
 // jsonProgress outputs structured JSON progress events
 type jsonProgress struct {
@@ -242,24 +133,4 @@ func (j *jsonProgress) emit(event string, data map[string]interface{}) {
 	}
 	raw, _ := json.Marshal(entry)
 	fmt.Fprintln(j.out, string(raw))
-}
-
-// isTTY checks if stdout is a terminal (for rich mode detection)
-func isTTY(f *os.File) bool {
-	fi, err := f.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) != 0
-}
-
-// truncate shortens strings for display
-func truncate(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	if max <= 3 {
-		return s[:max]
-	}
-	return s[:max-3] + "..."
 }

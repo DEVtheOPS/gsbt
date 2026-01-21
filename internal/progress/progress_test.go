@@ -88,24 +88,3 @@ func TestNewReturnsCorrectType(t *testing.T) {
 		t.Errorf("expected simpleProgress in text mode, got %T", p)
 	}
 }
-
-func TestTruncate(t *testing.T) {
-	tests := []struct {
-		input    string
-		max      int
-		expected string
-	}{
-		{"short", 10, "short"},
-		{"this is a long filename.txt", 15, "this is a lo..."},
-		{"abc", 3, "abc"},
-		{"abcd", 3, "abc"},
-		{"a", 1, "a"},
-	}
-
-	for _, tt := range tests {
-		result := truncate(tt.input, tt.max)
-		if result != tt.expected {
-			t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.max, result, tt.expected)
-		}
-	}
-}

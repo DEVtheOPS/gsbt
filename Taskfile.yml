@@ -1,14 +1,7 @@
-version: '3'
-
-docs: |
-  Common tasks for gsbt development.
-  Examples:
-    task build
-    task test
-    task run -- --help
+version: "3"
 
 vars:
-  GOFLAGS: ''
+  GOFLAGS: ""
 
 env:
   GO111MODULE: on
