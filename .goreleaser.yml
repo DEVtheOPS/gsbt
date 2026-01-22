@@ -1,9 +1,9 @@
 version: 2
 project_name: gsbt
 
-# before:
-#   hooks:
-#     - go test ./...
+before:
+  hooks:
+    - go generate ./internal/config/...
 
 builds:
   - id: gsbt
@@ -30,6 +30,8 @@ checksum:
 release:
   draft: false
   prerelease: "false"
+  extra_files:
+    - glob: gsbt.schema.json
 
 changelog:
   sort: desc

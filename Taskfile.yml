@@ -9,8 +9,14 @@ env:
 tasks:
   build:
     desc: Build gsbt binary
+    deps: [schema]
     cmds:
       - go build {{.GOFLAGS}} ./cmd/gsbt
+
+  schema:
+    desc: Generate JSON configuration schema
+    cmds:
+      - go generate ./internal/config/...
 
   test:
     desc: Run unit tests

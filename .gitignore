@@ -4,3 +4,4 @@ gsbt
 .gsbt-config.yml
 gameserver_backups/
 dist/
+gsbt.schema.json
