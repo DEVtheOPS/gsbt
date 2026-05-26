@@ -5,3 +5,5 @@ gsbt
 gameserver_backups/
 dist/
 gsbt.schema.json
+.opencode/
+docs/
