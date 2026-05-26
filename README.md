@@ -1,6 +1,14 @@
 # gsbt - Gameserver Backup Tool
 
+[![CI](https://img.shields.io/github/actions/workflow/status/devtheops/gameserver-backup-tool/ci.yml?branch=main&label=ci)](https://github.com/devtheops/gameserver-backup-tool/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/actions/workflow/status/devtheops/gameserver-backup-tool/release.yml?label=release)](https://github.com/devtheops/gameserver-backup-tool/actions/workflows/release.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/devtheops/gameserver-backup-tool)](https://github.com/devtheops/gameserver-backup-tool/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/devtheops/gsbt)](https://goreportcard.com/report/github.com/devtheops/gsbt)
+[![License](https://img.shields.io/github/license/devtheops/gameserver-backup-tool)](LICENSE)
+
 CLI tool to back up gameserver files via pluggable connectors (FTP, SFTP, Nitrado → FTP) into timestamped `.tar.gz` archives.
+
+See `CONTRIBUTING.md` for development and contribution guidance, and `SECURITY.md` for responsible vulnerability reporting.
 
 ## Features (current state)
 - **Connectors**: FTP, SFTP, Nitrado (fetches FTP creds via API)

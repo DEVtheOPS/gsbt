@@ -1,6 +1,6 @@
 module github.com/devtheops/gsbt
 
-go 1.25.5
+go 1.26.3
 
 require (
 	github.com/invopop/jsonschema v0.13.0
