@@ -34,8 +34,4 @@ release:
     - glob: gsbt.schema.json
 
 changelog:
-  sort: desc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^chore:"
+  disable: true
