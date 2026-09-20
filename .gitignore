@@ -1,9 +1,8 @@
 .env
-coverage.out
-gsbt
+/target
+/gsbt
 .gsbt-config.yml
 gameserver_backups/
-dist/
 gsbt.schema.json
 .opencode/
 docs/

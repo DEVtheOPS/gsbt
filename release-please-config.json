@@ -1,7 +1,7 @@
 {
   "packages": {
     ".": {
-      "release-type": "go",
+      "release-type": "rust",
       "package-name": "gsbt",
       "include-v-in-tag": true,
       "changelog-sections": [

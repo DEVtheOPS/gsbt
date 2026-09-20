@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-**gsbt** (Gameserver Backup Tool) is a CLI utility written in Go for backing up game server files. It supports pluggable connectors (FTP, SFTP, Nitrado) and creates timestamped `.tar.gz` archives.
+**gsbt** (Gameserver Backup Tool) is a CLI utility written in Rust for backing up game server files. It supports pluggable connectors (FTP, SFTP, Nitrado) and creates timestamped `.tar.gz` archives.
 
 ### Key Features
 
 * **Connectors:** FTP, SFTP, Nitrado (API wrapper around FTP).
-* **Output Modes:** Text (default), Rich (ANSI colors/progress), JSON (structured logging).
+* **Output Modes:** Text (default), JSON (structured logging).
 * **Configuration:** YAML-based with environment variable substitution support.
-* **Architecture:** Modular design with `internal/` packages for backup logic, connectors, logging, and configuration.
+* **Architecture:** Modular design with `src/` modules for backup logic, connectors, logging, and configuration.
 
 ## Building and Running
 
@@ -17,26 +17,32 @@ This project uses [Task](https://taskfile.dev/) for automation.
 
 | Command              | Description                                                            |
 | :------------------- | :--------------------------------------------------------------------- |
-| `task build`         | Builds the `gsbt` binary to the current directory.                     |
-| `task test`          | Runs all unit tests (`go test ./...`).                                 |
+| `task build`         | Builds the `gsbt` binary (release) and regenerates the schema.         |
+| `task test`          | Runs all unit tests (`cargo test --all-targets`).                      |
 | `task run -- [args]` | Runs the application from source. Example: `task run -- backup --help` |
-| `task tidy`          | Runs `go mod tidy` to clean up dependencies.                           |
+| `task fmt`           | Formats the source (`cargo fmt`).                                      |
+| `task lint`          | Runs clippy with warnings denied.                                      |
+| `task tidy`          | Updates dependencies (`cargo update`).                                 |
 
 ### Manual Commands
 
 If `task` is not available:
 
-* **Build:** `go build ./cmd/gsbt`
-* **Test:** `go test ./...`
-* **Run:** `go run ./cmd/gsbt [args]`
+* **Build:** `cargo build --release`
+* **Test:** `cargo test --all-targets`
+* **Run:** `cargo run -- [args]`
 
 ### Code Structure
 
-* `cmd/gsbt/`: Main entry point.
-* `internal/connector/`: FTP, SFTP, and Nitrado connector implementations.
-* `internal/backup/`: Core backup logic (archive creation, file transfer).
-* `internal/config/`: Configuration loading and parsing.
-* `internal/log/`: Custom logger with markup support.
+* `src/main.rs`: Binary entry point.
+* `src/lib.rs`: Library root exposing the modules.
+* `src/cli/`: Command line interface (`clap`).
+* `src/connector/`: FTP, SFTP, and Nitrado connector implementations.
+* `src/backup/`: Core backup logic (archive creation, file transfer).
+* `src/config/`: Configuration loading and parsing.
+* `src/log.rs`: Custom logger with markup support.
+* `src/progress.rs`: Progress reporting.
+* `src/bin/schema_gen.rs`: JSON schema generator (`schemars`).
 
 ### Configuration
 

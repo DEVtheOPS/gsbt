@@ -3,7 +3,6 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/devtheops/gameserver-backup-tool/ci.yml?branch=main&label=ci)](https://github.com/devtheops/gameserver-backup-tool/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/actions/workflow/status/devtheops/gameserver-backup-tool/release.yml?label=release)](https://github.com/devtheops/gameserver-backup-tool/actions/workflows/release.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/devtheops/gameserver-backup-tool)](https://github.com/devtheops/gameserver-backup-tool/releases)
-[![Go Report Card](https://goreportcard.com/badge/github.com/devtheops/gsbt)](https://goreportcard.com/report/github.com/devtheops/gsbt)
 [![License](https://img.shields.io/github/license/devtheops/gameserver-backup-tool)](LICENSE)
 
 CLI tool to back up gameserver files via pluggable connectors (FTP, SFTP, Nitrado → FTP) into timestamped `.tar.gz` archives.
@@ -11,7 +10,7 @@ CLI tool to back up gameserver files via pluggable connectors (FTP, SFTP, Nitrad
 See `CONTRIBUTING.md` for development and contribution guidance, and `SECURITY.md` for responsible vulnerability reporting.
 
 ## Features (current state)
-- **Connectors**: FTP, SFTP, Nitrado (fetches FTP creds via API)
+- **Connectors**: FTP (with optional explicit TLS), SFTP, Nitrado (fetches FTP creds via API)
 - **Backup command** downloads matched files, archives them, and stores per-server backups with timestamps
 - **Output modes**:
   - `text` (default): Plain text
@@ -24,15 +23,13 @@ See `CONTRIBUTING.md` for development and contribution guidance, and `SECURITY.m
 ## Install
 
 ### From release (recommended)
-Download binaries from GitHub Releases (published via GoReleaser when tagging `v*.*.*`). Place `gsbt` on your `$PATH`.
+Download binaries from GitHub Releases. Place `gsbt` on your `$PATH`.
 
 ### From source
 ```bash
-go install github.com/devtheops/gsbt/cmd/gsbt@latest
-```
-Or build locally:
-```bash
-go build ./cmd/gsbt
+cargo build --release
+# or install into ~/.cargo/bin
+cargo install --path .
 ```
 
 ## Usage
@@ -119,42 +116,43 @@ Files: 5, Total: 2.3 MB
 
 ### Quick Start
 
-- **Tests**: `go test ./...`
+- **Tests**: `cargo test --all-targets`
 - **Taskfile**: `task build`, `task test`, `task run -- --help`
-- **Release**: tag `vX.Y.Z`; GitHub Actions will build/publish via GoReleaser
+- **Release**: tag `vX.Y.Z`; GitHub Actions builds/publishes release artifacts
 
 ### Architecture
 
-**Packages:**
+Cargo workspace layout (`src/`):
 
-- `internal/log` - Standardized logging with markup support (stripped for text/json)
+- `log.rs` - Standardized logging with markup support (stripped for text/json)
   - Two modes: text (plain), json (structured)
   - Metadata support for structured context
-- `internal/progress` - Progress reporting interface
-  - `nullProgress` (quiet/json), `simpleProgress` (text)
-  - Integrates with logger for consistency
-- `internal/connector` - Pluggable connector interface
-  - FTP, SFTP, Nitrado implementations
+- `progress.rs` - Progress reporting
+  - `Reporter::Null` (quiet/json), `Reporter::Simple` (text)
+  - Integrates with the logger for consistency
+- `connector/` - Pluggable connector interface
+  - `Connector` trait with FTP, SFTP, Nitrado implementations
   - Pattern matching for include/exclude
-- `internal/backup` - Backup orchestration
-  - Archive creation, download management
+- `backup/` - Backup orchestration
+  - Archive creation (`archive.rs`), download management (`manager.rs`)
   - Progress reporting integration
-- `internal/config` - Configuration loading
-  - YAML parsing, env var substitution
+- `config/` - Configuration loading
+  - YAML parsing (`serde`), env var substitution
   - Config file discovery
+- `cli/` - Command line interface (`clap`)
 
 **Adding a new connector:**
 
-1. Implement `connector.Connector` interface
-2. Add factory case in `connector.NewConnector()`
-3. Follow existing patterns (FTP, SFTP examples)
+1. Implement the `connector::Connector` trait
+2. Add a factory case in `connector::factory::new_connector()`
+3. Follow existing patterns (`ftp.rs`, `sftp.rs`)
 
 **Adding markup to logs:**
 
 The logger supports markup tags like `[green]`, but they are currently stripped in all output modes.
 
-```go
-logger.Info("[green]Success![/green] Operation completed") // Output: Success! Operation completed
+```rust
+logger.info("[green]Success![/green] Operation completed"); // Output: Success! Operation completed
 ```
 
 ## Roadmap

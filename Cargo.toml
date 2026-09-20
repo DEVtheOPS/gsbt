@@ -1,0 +1,45 @@
+[package]
+name = "gsbt"
+version = "0.2.1"
+edition = "2021"
+rust-version = "1.85"
+description = "Gameserver Backup Tool - back up game server files via FTP, SFTP, and Nitrado"
+license = "MIT"
+repository = "https://github.com/devtheops/gameserver-backup-tool"
+readme = "README.md"
+default-run = "gsbt"
+
+[lib]
+name = "gsbt"
+path = "src/lib.rs"
+
+[[bin]]
+name = "gsbt"
+path = "src/main.rs"
+
+[[bin]]
+name = "gsbt-schema-gen"
+path = "src/bin/schema_gen.rs"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clap = { version = "4", features = ["derive"] }
+dotenvy = "0.15"
+flate2 = "1"
+regex = "1"
+schemars = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+ssh2 = "0.9"
+suppaftp = { version = "6", features = ["native-tls"] }
+tar = "0.4"
+ureq = { version = "2", features = ["json"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+strip = true
