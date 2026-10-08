@@ -2,13 +2,13 @@
 
 use std::fs::{self, File};
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 
 use crate::backup::archive::{create_archive, timestamped_filename};
-use crate::connector::Connector;
+use crate::connector::{Connector, FileInfo};
 use crate::progress::Reporter;
 
 /// Summary of a backup run.
@@ -26,6 +26,7 @@ pub struct Stats {
 pub struct Manager {
     pub temp_dir: String,
     pub backup_location: String,
+    pub server_name: String,
     pub progress: Reporter,
 }
 
@@ -110,8 +111,49 @@ impl Manager {
         create_archive(Path::new(&temp_dir), &archive_path).context("create archive")?;
 
         stats.duration = start.elapsed();
-        Ok((archive_path.to_string_lossy().into_owned(), stats))
+
+        let archive_path = archive_path.to_string_lossy().into_owned();
+        // Best-effort: write a readable transfer log next to the archive so the
+        // per-file details remain available even when a progress bar is shown.
+        let log_path = transfer_log_path(&archive_path);
+        let _ = write_transfer_log(&log_path, &self.server_name, &archive_path, &files, &stats);
+
+        Ok((archive_path, stats))
     }
+}
+
+/// Returns the transfer-log path for an archive
+/// (`foo.tar.gz` becomes `foo.log`, next to the archive).
+pub fn transfer_log_path(archive_path: &str) -> PathBuf {
+    match archive_path.strip_suffix(".tar.gz") {
+        Some(base) => PathBuf::from(format!("{base}.log")),
+        None => Path::new(archive_path).with_extension("log"),
+    }
+}
+
+fn write_transfer_log(
+    log_path: &Path,
+    server: &str,
+    archive_path: &str,
+    files: &[FileInfo],
+    stats: &Stats,
+) -> io::Result<()> {
+    let mut file = File::create(log_path)?;
+    writeln!(file, "# gsbt transfer log")?;
+    writeln!(file, "server: {server}")?;
+    writeln!(file, "archive: {archive_path}")?;
+    writeln!(file, "files: {}", stats.files)?;
+    writeln!(file, "bytes: {}", stats.bytes)?;
+    writeln!(file, "duration_sec: {:.3}", stats.duration.as_secs_f64())?;
+    writeln!(file, "---")?;
+
+    for entry in files {
+        if !entry.is_dir {
+            writeln!(file, "{}\t{}", entry.path, entry.size)?;
+        }
+    }
+
+    Ok(())
 }
 
 /// Wraps a writer to report incremental bytes written.
@@ -212,6 +254,7 @@ mod tests {
         let mut manager = Manager {
             temp_dir: String::new(),
             backup_location: tmp.path().to_string_lossy().into_owned(),
+            server_name: "test-server".to_string(),
             progress: crate::progress::new(&crate::log::Logger::new(), "json"),
         };
 
@@ -221,6 +264,13 @@ mod tests {
         assert_eq!(Path::new(&archive_path).parent().unwrap(), tmp.path());
         assert_eq!(stats.files, 2);
         assert_eq!(stats.bytes, ("hello".len() + "world".len()) as i64);
+
+        // A transfer log is written next to the archive.
+        let log_path = transfer_log_path(&archive_path);
+        let log = std::fs::read_to_string(&log_path).expect("transfer log");
+        assert!(log.contains("server: test-server"));
+        assert!(log.contains("file1.txt"));
+        assert!(log.contains("nested/file2.txt"));
     }
 
     #[test]
@@ -229,6 +279,7 @@ mod tests {
         let mut manager = Manager {
             temp_dir: String::new(),
             backup_location: String::new(),
+            server_name: "test-server".to_string(),
             progress: crate::progress::new(&crate::log::Logger::new(), "json"),
         };
         assert!(manager.backup(&mut conn).is_err());

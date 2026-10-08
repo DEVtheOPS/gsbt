@@ -21,7 +21,12 @@ pub struct BackupOptions {
 }
 
 /// Runs the backup command using the supplied connector factory.
-pub fn run_backup(opts: &BackupOptions, logger: &Logger, factory: &ConnectorFactory) -> Result<()> {
+pub fn run_backup(
+    opts: &BackupOptions,
+    logger: &Logger,
+    progress_factory: &progress::ProgressFactory,
+    factory: &ConnectorFactory,
+) -> Result<()> {
     let cfg_path = crate::config::find_config_file(&opts.config)?;
     let cfg = crate::config::load_config(&cfg_path)?;
 
@@ -35,8 +40,6 @@ pub fn run_backup(opts: &BackupOptions, logger: &Logger, factory: &ConnectorFact
     if servers.is_empty() {
         bail!("no servers configured");
     }
-
-    let format = opts.output.as_str();
 
     let run_one = |server: &Server| -> bool {
         let server_logger =
@@ -62,21 +65,26 @@ pub fn run_backup(opts: &BackupOptions, logger: &Logger, factory: &ConnectorFact
         let mut manager = Manager {
             backup_location: server.get_backup_location(&cfg.defaults),
             temp_dir: cfg.defaults.temp_dir.clone(),
-            progress: progress::new(&server_logger, format),
+            server_name: server.name.clone(),
+            progress: progress_factory.reporter(&server_logger, &server.name),
         };
 
         let start = Instant::now();
         match manager.backup(&mut *conn) {
             Ok((archive_path, stats)) => {
+                let log_path = crate::backup::transfer_log_path(&archive_path)
+                    .to_string_lossy()
+                    .into_owned();
                 server_logger.info_with(
                     format!(
-                        "[green]saved[/green] {archive_path} ({} files, {:.1} MB, {:.1}s)",
+                        "[green]saved[/green] {archive_path} ({} files, {:.1} MB, {:.1}s); log: {log_path}",
                         stats.files,
                         stats.bytes as f64 / 1e6,
                         start.elapsed().as_secs_f64()
                     ),
                     crate::meta! {
                         "archive_path" => archive_path,
+                        "log_path" => log_path,
                         "files" => stats.files,
                         "bytes" => stats.bytes,
                         "duration_sec" => start.elapsed().as_secs_f64(),
@@ -119,6 +127,8 @@ pub fn run_backup(opts: &BackupOptions, logger: &Logger, factory: &ConnectorFact
             results.iter().filter(|ok| !**ok).count(),
         )
     };
+
+    progress_factory.finish();
 
     if failures > 0 {
         bail!("backup complete with failures: {successes} success, {failures} failed");

@@ -4,7 +4,7 @@ pub mod backup;
 pub mod restore;
 
 use std::fs;
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
@@ -12,6 +12,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 
 use crate::connector::{Config as ConnectorConfig, Connector};
 use crate::log::Logger;
+use crate::progress;
 
 use backup::BackupOptions;
 use restore::RestoreCliArgs;
@@ -74,6 +75,15 @@ pub enum Commands {
         /// run backups sequentially
         #[arg(long)]
         sequential: bool,
+        /// show fancy progress bars (use --fancy=false to disable)
+        #[arg(
+            long,
+            default_value_t = true,
+            action = clap::ArgAction::Set,
+            num_args = 0..=1,
+            default_missing_value = "true"
+        )]
+        fancy: bool,
     },
     /// Remove old backups
     #[command(
@@ -151,11 +161,13 @@ pub enum Commands {
 /// Parses CLI arguments and executes the requested command.
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
+    let interactive = std::io::stdout().is_terminal() && std::io::stderr().is_terminal();
     execute(
         &cli,
         &crate::connector::new_connector,
         Box::new(std::io::stdout()),
         Box::new(std::io::stderr()),
+        interactive,
     )
 }
 
@@ -166,6 +178,7 @@ pub fn execute(
     factory: &ConnectorFactory,
     mut out: Box<dyn Write + Send>,
     err: Box<dyn Write + Send>,
+    interactive: bool,
 ) -> Result<()> {
     if cli.verbose && cli.quiet {
         bail!("--verbose and --quiet flags cannot be used together");
@@ -221,7 +234,15 @@ pub fn execute(
             };
             restore::run_restore(&args, &logger, factory)
         }
-        Some(Commands::Backup { server, sequential }) => {
+        Some(Commands::Backup {
+            server,
+            sequential,
+            fancy,
+        }) => {
+            let progress_factory =
+                progress::ProgressFactory::new(&cli.output, cli.quiet, interactive && *fancy);
+            let (out, err) = progress_factory.wrap_writers(out, err);
+
             let mut logger = Logger::with_writers(out, err);
             logger.set_output_format(&cli.output);
             logger.set_quiet(cli.quiet);
@@ -233,7 +254,7 @@ pub fn execute(
                 server: server.clone(),
                 sequential: *sequential,
             };
-            backup::run_backup(&opts, &logger, factory)
+            backup::run_backup(&opts, &logger, &progress_factory, factory)
         }
     }
 }
@@ -381,7 +402,13 @@ mod tests {
         let cli = Cli::try_parse_from(args).expect("parse args");
         let out = BufferWriter::new();
         let err = BufferWriter::new();
-        let result = execute(&cli, factory, Box::new(out.clone()), Box::new(err.clone()));
+        let result = execute(
+            &cli,
+            factory,
+            Box::new(out.clone()),
+            Box::new(err.clone()),
+            false,
+        );
         let mut combined = out.contents();
         combined.push_str(&err.contents());
         (result, combined)
@@ -402,6 +429,21 @@ mod tests {
         assert_eq!(cli.output, "json");
         assert!(cli.verbose);
         assert!(!cli.quiet);
+    }
+
+    #[test]
+    fn backup_fancy_flag_parses() {
+        let default = Cli::try_parse_from(["gsbt", "backup"]).expect("parse");
+        assert!(matches!(
+            default.command,
+            Some(Commands::Backup { fancy: true, .. })
+        ));
+
+        let disabled = Cli::try_parse_from(["gsbt", "backup", "--fancy=false"]).expect("parse");
+        assert!(matches!(
+            disabled.command,
+            Some(Commands::Backup { fancy: false, .. })
+        ));
     }
 
     #[test]
