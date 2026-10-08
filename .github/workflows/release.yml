@@ -28,7 +28,7 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.99.0
         with:
@@ -54,7 +54,7 @@ jobs:
           7z a "$archive" gsbt.exe
           sha256sum "$archive" > "$archive.sha256"
       - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: target/${{ matrix.target }}/release/gsbt_*.*
 
@@ -62,13 +62,13 @@ jobs:
     name: Publish configuration schema
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.99.0
       - name: Generate schema
         run: cargo run --quiet --bin gsbt-schema-gen -- gsbt.schema.json
       - name: Upload schema
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: gsbt.schema.json
 
@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.99.0
       - name: Publish crate
