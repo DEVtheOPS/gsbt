@@ -1,7 +1,6 @@
 //! gsbt - Gameserver Backup Tool.
 //!
-//! A Rust port of the original Go implementation. The crate is organised into
-//! modules that mirror the original package layout:
+//! The crate is organised into the following modules:
 //!
 //! - [`config`] - YAML configuration loading, discovery and env substitution.
 //! - [`connector`] - pluggable FTP/SFTP/Nitrado connectors.

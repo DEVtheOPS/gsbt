@@ -77,7 +77,7 @@ pub fn strip_markup(s: &str) -> String {
     MARKUP_REGEX.replace_all(s, "").into_owned()
 }
 
-/// Shared writer that mirrors the behaviour of an `io.Writer` reference in Go.
+/// Shared, cloneable writer used to capture or forward log output.
 ///
 /// Useful for tests and for capturing output from multiple threads.
 #[derive(Clone, Default)]
@@ -112,8 +112,8 @@ impl Write for BufferWriter {
 
 /// Structured logger with markup support.
 ///
-/// Clones share the underlying output writers (like copying an `io.Writer` in
-/// Go) but carry their own level/prefix/format configuration.
+/// Clones share the underlying output writers but carry their own
+/// level/prefix/format configuration.
 #[derive(Clone)]
 pub struct Logger {
     out: Arc<Mutex<Box<dyn Write + Send>>>,

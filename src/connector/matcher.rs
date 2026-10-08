@@ -1,8 +1,7 @@
 //! Include/exclude pattern matching.
 //!
-//! Implements the same semantics as Go's `path/filepath.Match` used by the
-//! original implementation: `*` and `?` never match a path separator, `[...]`
-//! denotes a character class, and `\` escapes the next character.
+//! Globs follow shell-style rules: `*` and `?` never match a path separator,
+//! `[...]` denotes a character class, and `\` escapes the next character.
 
 /// Returns `true` when `path` matches the include patterns and does not match
 /// the exclude patterns.
@@ -46,7 +45,7 @@ pub fn matches_patterns(path: &str, include: &[String], exclude: &[String]) -> b
     false
 }
 
-/// Returns the last element of a POSIX-style path (Go's `filepath.Base`).
+/// Returns the last element of a POSIX-style path.
 fn basename(path: &str) -> String {
     if path.is_empty() {
         return ".".to_string();

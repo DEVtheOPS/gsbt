@@ -15,9 +15,8 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// FTP connector implementation.
 ///
-/// The stream is always created as a TLS-capable stream; `into_secure` is only
-/// invoked when explicit TLS is requested. This mirrors the Go implementation
-/// where `DialWithExplicitTLS` is applied conditionally.
+/// The stream is always created as a TLS-capable stream; the TLS handshake is
+/// only performed when explicit TLS is requested.
 pub struct FtpConnector {
     config: Config,
     stream: Option<NativeTlsFtpStream>,

@@ -91,10 +91,7 @@ pub fn run_backup(opts: &BackupOptions, logger: &Logger, factory: &ConnectorFact
         }
     };
 
-    let successes;
-    let failures;
-
-    if opts.sequential || servers.len() == 1 {
+    let (successes, failures) = if opts.sequential || servers.len() == 1 {
         let mut ok = 0usize;
         let mut failed = 0usize;
         for server in &servers {
@@ -104,8 +101,7 @@ pub fn run_backup(opts: &BackupOptions, logger: &Logger, factory: &ConnectorFact
                 failed += 1;
             }
         }
-        successes = ok;
-        failures = failed;
+        (ok, failed)
     } else {
         let results = std::thread::scope(|scope| {
             let mut handles = Vec::with_capacity(servers.len());
@@ -118,9 +114,11 @@ pub fn run_backup(opts: &BackupOptions, logger: &Logger, factory: &ConnectorFact
                 .collect::<Vec<bool>>()
         });
 
-        successes = results.iter().filter(|ok| **ok).count();
-        failures = results.iter().filter(|ok| !**ok).count();
-    }
+        (
+            results.iter().filter(|ok| **ok).count(),
+            results.iter().filter(|ok| !**ok).count(),
+        )
+    };
 
     if failures > 0 {
         bail!("backup complete with failures: {successes} success, {failures} failed");

@@ -13,8 +13,10 @@
 ## Checklist
 
 - [ ] I have read `CONTRIBUTING.md`
-- [ ] `go test ./...` passes locally
-- [ ] `go build ./cmd/gsbt` passes locally
+- [ ] `cargo fmt --all -- --check` passes locally
+- [ ] `cargo clippy --all-targets -- -D warnings` passes locally
+- [ ] `cargo test --all-targets` passes locally
+- [ ] `cargo build --release` passes locally
 - [ ] I added or updated tests where appropriate
 - [ ] I updated docs/config examples if behavior changed
 - [ ] Commit messages follow Conventional Commits
