@@ -5,9 +5,24 @@ edition = "2021"
 rust-version = "1.85"
 description = "Gameserver Backup Tool - back up game server files via FTP, SFTP, and Nitrado"
 license = "MIT"
-repository = "https://github.com/devtheops/gameserver-backup-tool"
+repository = "https://github.com/DEVtheOPS/gsbt"
 readme = "README.md"
 default-run = "gsbt"
+keywords = ["backup", "gameserver", "ftp", "sftp", "cli"]
+categories = ["command-line-utilities", "filesystem"]
+exclude = [
+  "/.github",
+  "/docs",
+  "/.opencode",
+  "/Taskfile.yml",
+  "/.tool-versions",
+  "/rust-toolchain.toml",
+  "/AGENTS.md",
+  "/CLAUDE.md",
+  "/CONTRIBUTING.md",
+  "/SECURITY.md",
+  "/.editorconfig",
+]
 
 [lib]
 name = "gsbt"
