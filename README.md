@@ -89,8 +89,24 @@ gsbt backup --quiet
 - `--verbose` / `-v` – Enable debug logging and show metadata
 - `--quiet` / `-q` – Only show errors
 - `--sequential` – Run backups one server at a time (default is parallel)
+- `--fancy <bool>` – Show fancy per-server progress bars when the terminal supports it (default `true`; use `--fancy=false` to disable)
 
 Archives are stored at `{backup_location}/{timestamp}.tar.gz` with temp files under `{backup_location}/.tmp/`.
+
+When running on an interactive terminal, each server gets its own progress bar (they are not shown when output is piped, in `--quiet`/`--output json` mode, or with `--fancy=false`). A plain-text transfer log is always written next to each archive at `{backup_location}/{timestamp}.log`, listing the server, totals, and every transferred file, so the details remain available even while bars are drawn.
+
+```text
+# example transfer log
+# gsbt transfer log
+server: my-ftp
+archive: /srv/backups/my-ftp/2026-01-15_154500.tar.gz
+files: 5
+bytes: 2400000
+duration_sec: 3.201
+---
+saves/world.dat	1200000
+config/server.ini	10240
+```
 
 ### Output Modes
 
