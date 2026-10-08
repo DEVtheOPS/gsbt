@@ -1,6 +1,7 @@
 //! Command line interface.
 
 pub mod backup;
+pub mod restore;
 
 use std::fs;
 use std::io::Write;
@@ -13,6 +14,7 @@ use crate::connector::{Config as ConnectorConfig, Connector};
 use crate::log::Logger;
 
 use backup::BackupOptions;
+use restore::RestoreCliArgs;
 
 /// Factory used to create connectors. Injectable to allow testing.
 pub type ConnectorFactory = dyn Fn(ConnectorConfig) -> Result<Box<dyn Connector>> + Send + Sync;
@@ -113,9 +115,21 @@ pub enum Commands {
         /// show what would be restored
         #[arg(long)]
         dry_run: bool,
+        /// overwrite existing files
+        #[arg(long)]
+        overwrite: bool,
         /// skip confirmation prompt
         #[arg(long)]
         force: bool,
+        /// include glob (repeatable)
+        #[arg(long)]
+        include: Vec<String>,
+        /// exclude glob (repeatable)
+        #[arg(long)]
+        exclude: Vec<String>,
+        /// number of leading path components to strip
+        #[arg(long, default_value_t = 0)]
+        strip_components: usize,
     },
     /// Initialize a new configuration file
     #[command(
@@ -176,12 +190,36 @@ pub fn execute(
             writeln!(out, "prune command - not yet implemented")?;
             Ok(())
         }
-        Some(Commands::Restore { backup_file, .. }) => {
-            writeln!(
-                out,
-                "restore command - not yet implemented (file: {backup_file})"
-            )?;
-            Ok(())
+        Some(Commands::Restore {
+            backup_file,
+            server,
+            local,
+            dry_run,
+            overwrite,
+            force,
+            include,
+            exclude,
+            strip_components,
+        }) => {
+            let mut logger = Logger::with_writers(out, err);
+            logger.set_output_format(&cli.output);
+            logger.set_quiet(cli.quiet);
+            logger.set_verbose(cli.verbose);
+
+            let args = RestoreCliArgs {
+                config: cli.config.clone(),
+                output: cli.output.clone(),
+                backup_file: backup_file.clone(),
+                server: server.clone(),
+                local: local.clone(),
+                dry_run: *dry_run,
+                overwrite: *overwrite,
+                force: *force,
+                include: include.clone(),
+                exclude: exclude.clone(),
+                strip_components: *strip_components,
+            };
+            restore::run_restore(&args, &logger, factory)
         }
         Some(Commands::Backup { server, sequential }) => {
             let mut logger = Logger::with_writers(out, err);
@@ -477,10 +515,6 @@ mod tests {
         let (result, output) = run(&["gsbt", "list"], &factory);
         result.expect("list ok");
         assert!(output.contains("list command - not yet implemented"));
-
-        let (result, output) = run(&["gsbt", "restore", "backup.tar.gz"], &factory);
-        result.expect("restore ok");
-        assert!(output.contains("restore command - not yet implemented (file: backup.tar.gz)"));
     }
 
     #[test]

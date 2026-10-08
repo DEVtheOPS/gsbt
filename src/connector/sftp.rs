@@ -82,18 +82,9 @@ impl SftpConnector {
             None => bail!("not connected"),
         };
 
-        let mut current = String::new();
-        for component in dir.split('/') {
-            if component.is_empty() {
-                // Preserve a leading root slash.
-                if current.is_empty() {
-                    current.push('/');
-                }
-                continue;
-            }
-            current = join_posix(current.trim_end_matches('/'), component);
+        for prefix in super::dir_prefixes(dir) {
             // Ignore errors: the directory may already exist.
-            let _ = sftp.mkdir(Path::new(&current), 0o755);
+            let _ = sftp.mkdir(Path::new(&prefix), 0o755);
         }
 
         Ok(())

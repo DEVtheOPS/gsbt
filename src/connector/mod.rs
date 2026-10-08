@@ -96,3 +96,81 @@ pub(crate) fn relative_path(remote_root: &str, full: &str) -> String {
         None => full.trim_start_matches('/').to_string(),
     }
 }
+
+/// Returns the cumulative directory prefixes of `dir`, preserving a leading
+/// root slash: `"/a/b/c"` yields `["/a", "/a/b", "/a/b/c"]`.
+///
+/// Used to create remote directories recursively, since FTP `MKD` (and many
+/// SFTP servers) only create a single level at a time.
+pub(crate) fn dir_prefixes(dir: &str) -> Vec<String> {
+    let mut current = if dir.starts_with('/') {
+        String::from("/")
+    } else {
+        String::new()
+    };
+    let mut prefixes = Vec::new();
+
+    for component in dir.split('/') {
+        if component.is_empty() {
+            continue;
+        }
+        if current.is_empty() {
+            current = component.to_string();
+        } else if current == "/" {
+            current = format!("/{component}");
+        } else {
+            current.push('/');
+            current.push_str(component);
+        }
+        prefixes.push(current.clone());
+    }
+
+    prefixes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn join_posix_behaviour() {
+        assert_eq!(join_posix("", "a"), "a");
+        assert_eq!(join_posix("a", ""), "a");
+        assert_eq!(join_posix("/a", "b"), "/a/b");
+        assert_eq!(join_posix("/a/", "b"), "/a/b");
+    }
+
+    #[test]
+    fn relative_path_behaviour() {
+        assert_eq!(relative_path("/root", "/root/a/b"), "a/b");
+        assert_eq!(relative_path("/root/", "/root/a"), "a");
+        assert_eq!(relative_path("", "/a"), "a");
+    }
+
+    #[test]
+    fn dir_prefixes_absolute() {
+        assert_eq!(
+            dir_prefixes("/palworld/Pal/Saved/SaveGames"),
+            vec![
+                "/palworld".to_string(),
+                "/palworld/Pal".to_string(),
+                "/palworld/Pal/Saved".to_string(),
+                "/palworld/Pal/Saved/SaveGames".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn dir_prefixes_relative() {
+        assert_eq!(
+            dir_prefixes("a/b/c"),
+            vec!["a".to_string(), "a/b".to_string(), "a/b/c".to_string()]
+        );
+    }
+
+    #[test]
+    fn dir_prefixes_empty() {
+        assert!(dir_prefixes("").is_empty());
+        assert!(dir_prefixes("/").is_empty());
+    }
+}

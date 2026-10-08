@@ -1,6 +1,6 @@
 //! FTP connector (with optional explicit TLS).
 
-use std::io::{Cursor, Read, Write};
+use std::io::{Read, Write};
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 
@@ -158,21 +158,24 @@ impl Connector for FtpConnector {
             None => String::new(),
         };
 
-        // `put_file` requires a sized reader; buffer the input.
-        let mut buffer = Vec::new();
-        r.read_to_end(&mut buffer)?;
-        let mut cursor = Cursor::new(buffer);
-
         let stream = self.stream_mut()?;
-        if !dir.is_empty() {
-            // Ignore errors: the directory may already exist.
-            let _ = stream.mkdir(&dir);
+
+        // Create intermediate directories recursively. `MKD` only creates a
+        // single level, so nested archive paths need each parent first. Errors
+        // are ignored because the directory may already exist.
+        for prefix in super::dir_prefixes(&dir) {
+            let _ = stream.mkdir(&prefix);
         }
 
+        let mut data = stream
+            .put_with_stream(&full_path)
+            .map_err(|e| anyhow::anyhow!("failed to upload {remote_path}: {e}"))?;
+        std::io::copy(r, &mut data)
+            .map_err(|e| anyhow::anyhow!("failed to upload {remote_path}: {e}"))?;
         stream
-            .put_file(&full_path, &mut cursor)
-            .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("failed to upload {remote_path}: {e}"))
+            .finalize_put_stream(data)
+            .map_err(|e| anyhow::anyhow!("failed to upload {remote_path}: {e}"))?;
+        Ok(())
     }
 
     fn close(&mut self) -> Result<()> {

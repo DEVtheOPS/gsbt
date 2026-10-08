@@ -16,3 +16,4 @@ pub mod config;
 pub mod connector;
 pub mod log;
 pub mod progress;
+pub mod restore;
