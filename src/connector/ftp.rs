@@ -5,7 +5,7 @@ use std::net::ToSocketAddrs;
 use std::time::Duration;
 
 use anyhow::{bail, Result};
-use suppaftp::list::File as ListFile;
+use suppaftp::list::ListParser;
 use suppaftp::{Mode, NativeTlsFtpStream};
 
 use super::matcher::matches_patterns;
@@ -54,7 +54,7 @@ impl FtpConnector {
             .map_err(|e| anyhow::anyhow!("failed to list {dir}: {e}"))?;
 
         for line in entries {
-            let entry = match ListFile::from_posix_line(&line) {
+            let entry = match ListParser::parse_posix(&line) {
                 Ok(entry) => entry,
                 Err(_) => continue,
             };
@@ -171,8 +171,7 @@ impl Connector for FtpConnector {
             .map_err(|e| anyhow::anyhow!("failed to upload {remote_path}: {e}"))?;
         std::io::copy(r, &mut data)
             .map_err(|e| anyhow::anyhow!("failed to upload {remote_path}: {e}"))?;
-        stream
-            .finalize_put_stream(data)
+        data.finish()
             .map_err(|e| anyhow::anyhow!("failed to upload {remote_path}: {e}"))?;
         Ok(())
     }
