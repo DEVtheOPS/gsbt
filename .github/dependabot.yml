@@ -17,3 +17,7 @@ updates:
       github-actions:
         patterns:
           - "*"
+    ignore:
+      # The ref is a Rust toolchain version, not an action version. Dependabot
+      # otherwise "bumps" it to a nonexistent tag (e.g. 1.99.0 -> 1.120.0).
+      - dependency-name: "dtolnay/rust-toolchain"
