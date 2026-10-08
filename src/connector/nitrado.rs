@@ -72,29 +72,37 @@ impl NitradoConnector {
     fn fetch_ftp_credentials(&self) -> Result<FtpCredentials> {
         let url = format!("{}/services/{}/gameservers", self.api_base, self.service_id);
 
-        let response = ureq::get(&url)
-            .set("Authorization", &format!("Bearer {}", self.api_key))
-            .set("Accept", "application/json")
-            .call();
+        let agent = ureq::Agent::config_builder()
+            .http_status_as_error(false)
+            .timeout_global(Some(std::time::Duration::from_secs(30)))
+            .build()
+            .new_agent();
 
-        let response = match response {
-            Ok(response) => response,
-            Err(ureq::Error::Status(429, response)) => {
-                let retry_after = response
-                    .header("Retry-After")
-                    .unwrap_or("unknown")
-                    .to_string();
-                bail!("rate limited by Nitrado API (retry after: {retry_after})");
-            }
-            Err(ureq::Error::Status(code, response)) => {
-                let body = response.into_string().unwrap_or_default();
-                bail!("Nitrado API error (status {code}): {body}");
-            }
-            Err(err) => return Err(anyhow::anyhow!(err)),
-        };
+        let mut response = agent
+            .get(url.as_str())
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Accept", "application/json")
+            .call()
+            .map_err(|err| anyhow::anyhow!(err))?;
+
+        let status = response.status().as_u16();
+        if status == 429 {
+            let retry_after = response
+                .headers()
+                .get("Retry-After")
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or("unknown")
+                .to_string();
+            bail!("rate limited by Nitrado API (retry after: {retry_after})");
+        }
+        if status != 200 {
+            let body = response.body_mut().read_to_string().unwrap_or_default();
+            bail!("Nitrado API error (status {status}): {body}");
+        }
 
         let parsed: NitradoFtpResponse = response
-            .into_json()
+            .body_mut()
+            .read_json()
             .map_err(|e| anyhow::anyhow!("failed to parse Nitrado response: {e}"))?;
 
         if parsed.status != "success" {
