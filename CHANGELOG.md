@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/DEVtheOPS/gsbt/compare/v0.3.0...v0.4.0) (2026-10-08)
+
+
+### Features
+
+* **progress:** per-server progress bars and transfer log ([#26](https://github.com/DEVtheOPS/gsbt/issues/26)) ([a10dfb0](https://github.com/DEVtheOPS/gsbt/commit/a10dfb0e464e1207e4427f859fcb572f58fb3e1d))
+
 ## [0.3.0](https://github.com/DEVtheOPS/gsbt/compare/v0.2.0...v0.3.0) (2026-10-08)
 
 
