@@ -1,6 +1,6 @@
 [package]
 name = "gsbt"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Gameserver Backup Tool - back up game server files via FTP, SFTP, and Nitrado"
