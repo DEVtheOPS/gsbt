@@ -14,12 +14,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # Release PRs only bump the version/changelog (the code was already
+      # tested when it landed on main), so skip the build and tests. The job
+      # still runs so the required "test" status check is reported.
+      - name: Skip (release-please PR)
+        if: ${{ startsWith(github.head_ref || '', 'release-please--') }}
+        run: echo "release-please PR - skipping format, clippy and tests"
+
       - uses: actions/checkout@v7
+        if: ${{ !startsWith(github.head_ref || '', 'release-please--') }}
       - name: Install Rust toolchain
+        if: ${{ !startsWith(github.head_ref || '', 'release-please--') }}
         uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: clippy, rustfmt
       - name: Cache cargo
+        if: ${{ !startsWith(github.head_ref || '', 'release-please--') }}
         uses: actions/cache@v6
         with:
           path: |
@@ -30,8 +40,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       - name: Check formatting
+        if: ${{ !startsWith(github.head_ref || '', 'release-please--') }}
         run: cargo fmt --all -- --check
       - name: Run clippy
+        if: ${{ !startsWith(github.head_ref || '', 'release-please--') }}
         run: cargo clippy --all-targets -- -D warnings
       - name: Run tests
+        if: ${{ !startsWith(github.head_ref || '', 'release-please--') }}
         run: cargo test --all-targets
