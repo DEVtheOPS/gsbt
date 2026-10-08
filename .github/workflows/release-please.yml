@@ -17,4 +17,4 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v5
         with:
-          release-type: go
+          release-type: rust
