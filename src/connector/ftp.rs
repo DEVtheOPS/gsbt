@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Result};
 use suppaftp::list::ListParser;
+use suppaftp::types::FileType;
 use suppaftp::{Mode, NativeTlsFtpStream};
 
 use super::matcher::matches_patterns;
@@ -117,6 +118,17 @@ impl Connector for FtpConnector {
         stream
             .login(&self.config.username, &self.config.password)
             .map_err(|e| anyhow::anyhow!("FTP login failed: {e}"))?;
+
+        // Backups contain arbitrary bytes (archives, save files, SQLite
+        // databases), so every transfer must use binary mode. `suppaftp` never
+        // sends `TYPE` on its own, which leaves the server on its default -
+        // usually `TYPE A` (RFC 959). ASCII mode rewrites line endings and
+        // silently corrupts downloaded files, which is especially noticeable on
+        // Nitrado's FTP servers. `TYPE` is a session setting, so it has to be
+        // issued after login and before the first `RETR`/`STOR`.
+        stream
+            .transfer_type(FileType::Binary)
+            .map_err(|e| anyhow::anyhow!("failed to set FTP binary transfer mode: {e}"))?;
 
         self.stream = Some(stream);
         Ok(())
