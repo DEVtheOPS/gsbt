@@ -85,7 +85,7 @@ impl Manager {
 
             self.progress.file_start(&file.path, file.size);
 
-            {
+            let downloaded = {
                 let progress = &mut self.progress;
                 let path = file.path.clone();
                 let size = file.size;
@@ -97,9 +97,24 @@ impl Manager {
                 };
                 conn.download(&path, &mut writer)
                     .with_context(|| format!("download {}", file.path))?;
-            }
+                writer.written
+            };
 
             self.progress.file_done(&file.path);
+
+            // Guard against silent transfer corruption (e.g. an FTP server
+            // whose session is still in ASCII mode rewriting line endings).
+            // Sizes are only checked when the server reported a usable one;
+            // connectors may report 0 for entries whose size is unknown.
+            if file.size > 0 && downloaded != file.size {
+                bail!(
+                    "download {}: expected {} bytes but received {}; \
+                     the file was not transferred intact",
+                    file.path,
+                    file.size,
+                    downloaded
+                );
+            }
         }
 
         self.progress.close();
@@ -271,6 +286,33 @@ mod tests {
         assert!(log.contains("server: test-server"));
         assert!(log.contains("file1.txt"));
         assert!(log.contains("nested/file2.txt"));
+    }
+
+    #[test]
+    fn backup_fails_on_download_size_mismatch() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let mut conn = MockConnector {
+            files: vec![FileInfo {
+                path: "world.dat".to_string(),
+                size: 10,
+                mod_time: SystemTime::now(),
+                is_dir: false,
+            }],
+            data: std::collections::HashMap::from([("world.dat".to_string(), "short".to_string())]),
+            connected: false,
+        };
+
+        let mut manager = Manager {
+            temp_dir: String::new(),
+            backup_location: tmp.path().to_string_lossy().into_owned(),
+            server_name: "test-server".to_string(),
+            progress: crate::progress::new(&crate::log::Logger::new(), "json"),
+        };
+
+        let err = manager.backup(&mut conn).expect_err("mismatch must fail");
+        let message = err.to_string();
+        assert!(message.contains("expected 10 bytes"), "{message}");
+        assert!(message.contains("received 5"), "{message}");
     }
 
     #[test]
