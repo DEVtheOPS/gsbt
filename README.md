@@ -3,6 +3,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/devtheops/gameserver-backup-tool/ci.yml?branch=main&label=ci)](https://github.com/devtheops/gameserver-backup-tool/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/actions/workflow/status/devtheops/gameserver-backup-tool/release.yml?label=release)](https://github.com/devtheops/gameserver-backup-tool/actions/workflows/release.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/devtheops/gameserver-backup-tool)](https://github.com/devtheops/gameserver-backup-tool/releases)
+[![crates.io](https://img.shields.io/crates/v/gsbt.svg)](https://crates.io/crates/gsbt)
 [![License](https://img.shields.io/github/license/devtheops/gameserver-backup-tool)](LICENSE)
 
 CLI tool to back up gameserver files via pluggable connectors (FTP, SFTP, Nitrado → FTP) into timestamped `.tar.gz` archives.
@@ -23,8 +24,14 @@ See `CONTRIBUTING.md` for development and contribution guidance, and `SECURITY.m
 
 ## Install
 
-### From release (recommended)
-Download binaries from GitHub Releases. Place `gsbt` on your `$PATH`.
+### From crates.io (recommended)
+```bash
+cargo install gsbt
+```
+Installs the latest release into `~/.cargo/bin` (requires Rust 1.85+).
+
+### From release
+Prebuilt binaries for Linux, macOS and Windows are published on GitHub Releases. Place `gsbt` on your `$PATH`.
 
 ### From source
 ```bash
