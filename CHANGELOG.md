@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.1](https://github.com/DEVtheOPS/gsbt/compare/v0.4.0...v0.4.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **backup:** accept files that grew after listing ([f78da41](https://github.com/DEVtheOPS/gsbt/commit/f78da418b4de793b60a7e6331fbbb467d8c577ab))
+* **backup:** accept files that grew after listing ([fd041d1](https://github.com/DEVtheOPS/gsbt/commit/fd041d16b99f4f30d0bdaea5b38644743ff9b45e))
+* **backup:** fail when downloaded size does not match listing ([26384f0](https://github.com/DEVtheOPS/gsbt/commit/26384f04335993878b7490a6b96f52e4e6ecd1da))
+* **ftp:** force binary transfer mode before transfers ([0788185](https://github.com/DEVtheOPS/gsbt/commit/078818562cf57337ac0bfcb299fe76e873e7af1f))
+* **ftp:** force binary transfer mode to prevent corrupt downloads ([396e122](https://github.com/DEVtheOPS/gsbt/commit/396e122e47b70bac4fd54af417e10e243b25b129))
+
 ## [0.4.0](https://github.com/DEVtheOPS/gsbt/compare/v0.3.0...v0.4.0) (2026-10-08)
 
 
