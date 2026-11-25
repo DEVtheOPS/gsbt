@@ -102,13 +102,18 @@ impl Manager {
 
             self.progress.file_done(&file.path);
 
-            // Guard against silent transfer corruption (e.g. an FTP server
+            // Guard against silent transfer truncation (e.g. an FTP server
             // whose session is still in ASCII mode rewriting line endings).
-            // Sizes are only checked when the server reported a usable one;
-            // connectors may report 0 for entries whose size is unknown.
-            if file.size > 0 && downloaded != file.size {
+            // Only short transfers are fatal: game servers keep writing to
+            // saves and logs, so a file that grew between `list` and the
+            // download legitimately yields more bytes than listed. Accepting
+            // the growth lets the backup complete with the newer contents
+            // instead of aborting before any archive is written. Sizes are
+            // only checked when the server reported a usable one; connectors
+            // may report 0 for entries whose size is unknown.
+            if file.size > 0 && downloaded < file.size {
                 bail!(
-                    "download {}: expected {} bytes but received {}; \
+                    "download {}: expected at least {} bytes but received {}; \
                      the file was not transferred intact",
                     file.path,
                     file.size,
@@ -288,8 +293,17 @@ mod tests {
         assert!(log.contains("nested/file2.txt"));
     }
 
+    fn manager_for(tmp: &tempfile::TempDir) -> Manager {
+        Manager {
+            temp_dir: String::new(),
+            backup_location: tmp.path().to_string_lossy().into_owned(),
+            server_name: "test-server".to_string(),
+            progress: crate::progress::new(&crate::log::Logger::new(), "json"),
+        }
+    }
+
     #[test]
-    fn backup_fails_on_download_size_mismatch() {
+    fn backup_fails_on_short_download() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let mut conn = MockConnector {
             files: vec![FileInfo {
@@ -302,17 +316,66 @@ mod tests {
             connected: false,
         };
 
-        let mut manager = Manager {
-            temp_dir: String::new(),
-            backup_location: tmp.path().to_string_lossy().into_owned(),
-            server_name: "test-server".to_string(),
-            progress: crate::progress::new(&crate::log::Logger::new(), "json"),
-        };
+        let mut manager = manager_for(&tmp);
 
         let err = manager.backup(&mut conn).expect_err("mismatch must fail");
         let message = err.to_string();
-        assert!(message.contains("expected 10 bytes"), "{message}");
+        assert!(message.contains("expected at least 10 bytes"), "{message}");
         assert!(message.contains("received 5"), "{message}");
+    }
+
+    #[test]
+    fn backup_accepts_file_that_grew_after_listing() {
+        // Live game servers keep appending to saves and logs, so a file can be
+        // larger than the size reported by `list`. The backup must archive the
+        // newer contents instead of aborting before writing an archive.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let mut conn = MockConnector {
+            files: vec![FileInfo {
+                path: "server.log".to_string(),
+                size: 5,
+                mod_time: SystemTime::now(),
+                is_dir: false,
+            }],
+            data: std::collections::HashMap::from([(
+                "server.log".to_string(),
+                "hello world".to_string(),
+            )]),
+            connected: false,
+        };
+
+        let mut manager = manager_for(&tmp);
+
+        let (archive_path, stats) = manager.backup(&mut conn).expect("growth must not fail");
+        assert!(Path::new(&archive_path).exists(), "archive not created");
+        assert_eq!(stats.files, 1);
+
+        // The whole file, including the bytes appended after listing, is kept.
+        let downloaded = std::fs::read_to_string(tmp.path().join(".tmp").join("server.log"))
+            .expect("downloaded file");
+        assert_eq!(downloaded, "hello world");
+    }
+
+    #[test]
+    fn backup_skips_size_check_for_unknown_sizes() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let mut conn = MockConnector {
+            files: vec![FileInfo {
+                path: "world.dat".to_string(),
+                size: 0,
+                mod_time: SystemTime::now(),
+                is_dir: false,
+            }],
+            data: std::collections::HashMap::from([("world.dat".to_string(), "data".to_string())]),
+            connected: false,
+        };
+
+        let mut manager = manager_for(&tmp);
+
+        let (archive_path, _) = manager
+            .backup(&mut conn)
+            .expect("unknown size must not fail");
+        assert!(Path::new(&archive_path).exists(), "archive not created");
     }
 
     #[test]

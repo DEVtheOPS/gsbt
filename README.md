@@ -93,6 +93,8 @@ gsbt backup --quiet
 
 Archives are stored at `{backup_location}/{timestamp}.tar.gz` with temp files under `{backup_location}/.tmp/`.
 
+Live files can change while a backup is running: anything appended to a save or log after it was listed is downloaded and archived with the backup. A transfer that returns *fewer* bytes than the listing reported is treated as incomplete and aborts the backup.
+
 When running on an interactive terminal, each server gets its own progress bar (they are not shown when output is piped, in `--quiet`/`--output json` mode, or with `--fancy=false`). A plain-text transfer log is always written next to each archive at `{backup_location}/{timestamp}.log`, listing the server, totals, and every transferred file, so the details remain available even while bars are drawn.
 
 ```text
